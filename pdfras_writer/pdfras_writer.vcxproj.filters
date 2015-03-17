@@ -1,0 +1,112 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="PdfAlloc.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="PdfArray.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="PdfAtoms.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="PdfContentsGenerator.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="PdfDatasink.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="PdfDict.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="PdfElements.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="PdfHash.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="PdfOS.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="PdfRaster.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="PdfStandardObjects.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="PdfStreaming.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="PdfString.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="PdfStrings.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="PdfXrefTable.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="PdfAlloc.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="PdfArray.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="PdfAtoms.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="PdfContentsGenerator.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="PdfDatasink.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="PdfDict.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="PdfElements.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="PdfHash.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="PdfOS.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="PdfPlatform.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="PdfRaster.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="PdfStandardAtoms.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="PdfStandardObjects.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="PdfStreaming.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="PdfString.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="PdfStrings.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="PdfXrefTable.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{1429a7c6-f43e-4c32-887f-7733db8dffcd}</UniqueIdentifier>
+      <Extensions>*.h;*.hpp</Extensions>
+    </Filter>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{8232ebc1-bd97-4738-8cca-7979b13888f3}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>
