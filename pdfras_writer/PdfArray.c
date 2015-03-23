@@ -136,7 +136,7 @@ void pd_array_foreach(t_pdarray *arr, f_pdarray_iterator iter, void *cookie)
 	}
 }
 
-t_pdarray *pd_array_build(t_pdallocsys *alloc, pduint32 size, t_pdvalue value, ...)
+t_pdarray *pd_array_build(t_pdallocsys *alloc, pduint32 size, /* t_pdvalue value, */...)
 {
 	va_list ap;
 	pduint32 i;
@@ -151,7 +151,7 @@ t_pdarray *pd_array_build(t_pdallocsys *alloc, pduint32 size, t_pdvalue value, .
 	return arr;
 }
 
-t_pdarray *pd_array_buildints(t_pdallocsys *alloc, pduint32 size, pdint32 value, ...)
+t_pdarray *pd_array_buildints(t_pdallocsys *alloc, pduint32 size, /* pdint32 value, */  ...)
 {
 	va_list ap;
 	pduint32 i;
@@ -166,7 +166,7 @@ t_pdarray *pd_array_buildints(t_pdallocsys *alloc, pduint32 size, pdint32 value,
 	return arr;
 }
 
-t_pdarray *pd_array_buildfloats(t_pdallocsys *alloc, pduint32 size, double value, ...)
+t_pdarray *pd_array_buildfloats(t_pdallocsys *alloc, pduint32 size, /* double value, */ ...)
 {
 	va_list ap;
 	pduint32 i;

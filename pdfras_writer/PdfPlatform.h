@@ -20,14 +20,37 @@ typedef pduint32 pdbool;
 #define PDDEBUG _DEBUG
 #define PD_FALSE ((pdbool)0)
 #define PD_TRUE ((pdbool)!0)
-#endif
 
+#include <time.h>
+#include <sys\timeb.h>
 #include <float.h>
 
 #define pdisinf(x) (!_finite(x))
 #define pdisnan(x) (_isnan(x))
 
+#endif
+
 #ifndef PDPLATFORM
-#error Target platform not defined.
+
+# include  <stdint.h>
+# include  <time.h>
+#define PDPLATFORM "GENERIC"
+typedef int8_t pdint8;
+typedef uint8_t pduint8;
+typedef int16_t pdint16;
+typedef uint16_t pduint16;
+typedef int32_t pdint32;
+typedef uint32_t pduint32;
+
+typedef float pdfloat32;
+typedef double pddouble;
+typedef int pdbool;
+
+#define pdisinf(x) isinf(x)
+#define pdisnan(x) isnan(x)
+
+#define PDDEBUG _DEBUG
+#define PD_FALSE ((pdbool)0)
+#define PD_TRUE ((pdbool)!0)
 #endif
 #endif

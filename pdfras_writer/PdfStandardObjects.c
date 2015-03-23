@@ -1,6 +1,4 @@
 #include <assert.h>
-#include <time.h>
-#include <sys\timeb.h>
 
 #include "PdfStandardObjects.h"
 #include "PdfStrings.h"

@@ -19,8 +19,8 @@ extern t_pdvalue pd_array_remove(t_pdarray *arr, pduint32 index);
 typedef pdbool(*f_pdarray_iterator)(t_pdarray *arr, pduint32 currindex, t_pdvalue value, void *cookie);
 extern void pd_array_foreach(t_pdarray *arr, f_pdarray_iterator iter, void *cookie);
 
-extern t_pdarray *pd_array_build(t_pdallocsys *alloc, pduint32 size, t_pdvalue value, ...);
-extern t_pdarray *pd_array_buildints(t_pdallocsys *alloc, pduint32 size, pdint32 value, ...);
-extern t_pdarray *pd_array_buildfloats(t_pdallocsys *alloc, pduint32 size, double value, ...);
+extern t_pdarray *pd_array_build(t_pdallocsys *alloc, pduint32 size, /* t_pdvalue value, */ ...);
+extern t_pdarray *pd_array_buildints(t_pdallocsys *alloc, pduint32 size, /* pdint32 value, */ ...);
+extern t_pdarray *pd_array_buildfloats(t_pdallocsys *alloc, pduint32 size, /* double value, */...);
 
 #endif

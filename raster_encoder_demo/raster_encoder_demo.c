@@ -65,7 +65,7 @@ int main(int argc, char** argv)
 	FILE *fp;
 	t_OS os;
 
-	if (fopen_s(&fp, OUTPUT_FILENAME, "wb") != 0) {
+	if ( (fp = fopen(OUTPUT_FILENAME, "wb")) == 0) {
 		fprintf(stderr, "unable to open %s for writing\n", OUTPUT_FILENAME);
 		return 1;
 	}
