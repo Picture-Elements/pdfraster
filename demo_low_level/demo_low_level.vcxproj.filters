@@ -11,7 +11,7 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="low_level_demo.c">
+    <ClCompile Include="demo_low_level.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

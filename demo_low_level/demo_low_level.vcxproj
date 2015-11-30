@@ -10,6 +10,9 @@
       <Platform>Win32</Platform>
     </ProjectConfiguration>
   </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="demo_low_level.c" />
+  </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{C74CA555-AE5D-4057-B94B-2D13BB8CA27E}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
@@ -79,9 +82,6 @@
       <AdditionalDependencies>$(SolutionDir)$(Configuration)\pdfras_writer.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
-  <ItemGroup>
-    <ClCompile Include="low_level_demo.c" />
-  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
