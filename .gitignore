@@ -10,3 +10,5 @@ raster_encoder_demo/bw_ccitt_data.h
 raster_encoder_demo/color_page.h
 raster_encoder_demo/raster.pdf
 raster_encoder_demo/raster_encoder_demo
+*.sdf
+*.opensdf
