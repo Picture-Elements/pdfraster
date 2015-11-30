@@ -7,8 +7,13 @@
 
 #include "PdfRaster.h"
 
-#include "bw_ccitt_data.h"
+#include "bw_ccitt_page.h"
 #include "color_page.h"
+
+/* Visual Studio 2005 has 'deprecated' many of the standard CRT functions */
+#ifdef _MSC_VER
+#pragma warning(disable:4996)
+#endif
 
 #define OUTPUT_FILENAME "raster.pdf"
 
@@ -136,7 +141,7 @@ int main(int argc, char** argv)
 	pd_raster_encoder_start_page(enc, PDFRAS_BITONAL, PDFRAS_CCITTG4, 2521);
 	pd_raster_set_physical_page_number(enc, 3);			// physical page 2
 	pd_raster_set_page_front(enc, 0);					// back side
-	pd_raster_encoder_write_strip(enc, 3279, bw_ccitt_data, sizeof bw_ccitt_data);
+	pd_raster_encoder_write_strip(enc, 3279, bw_ccitt_page_bin, sizeof bw_ccitt_page_bin);
 	pd_raster_encoder_end_page(enc);
 
 	// Next page: color 3.5" x 2" 50 DPI
