@@ -18,13 +18,13 @@
     <ClInclude Include="color_page.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="bw_ccitt_page.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="raster_encoder_demo.c">
       <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="bw_ccitt_data.h">
-      <Filter>Header Files</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

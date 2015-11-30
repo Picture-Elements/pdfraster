@@ -80,10 +80,10 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="bw_ccitt_page.h" />
     <ClInclude Include="color_page.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="bw_ccitt_data.h" />
     <ClCompile Include="raster_encoder_demo.c" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

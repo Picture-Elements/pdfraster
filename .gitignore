@@ -19,3 +19,4 @@ raster_encoder_demo/raster_encoder_demo
 [Rr]eleases/
 x64/
 x86/
+**/output.pdf
