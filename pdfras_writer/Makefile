@@ -30,8 +30,8 @@ PdfAlloc.o: PdfAlloc.c  PdfAlloc.h PdfPlatform.h
 PdfArray.o: PdfArray.c  PdfArray.h PdfPlatform.h
 PdfAtoms.o: PdfAtoms.c  PdfAtoms.h PdfStandardAtoms.h PdfPlatform.h
 PdfContentsGenerator.o: PdfContentsGenerator.c PdfContentsGenerator.h PdfDatasink.h PdfStreaming.h PdfAlloc.h
-PdfDatasink.o: PdfDatasink.c PdfDatasink.h PdfElements.h PdfAlloc.h
-PdfDict.o: PdfDict.c PdfDict.h PdfHash.h PdfElements.h PdfAtoms.h PdfDatasink.h PdfXrefTable.h PdfStandardAtoms.h
+PdfDatasink.o: PdfDatasink.c PdfDatasink.h PdfAlloc.h
+PdfDict.o: PdfDict.c PdfDict.h PdfHash.h PdfAtoms.h PdfDatasink.h PdfXrefTable.h PdfStandardAtoms.h
 PdfHash.o: PdfHash.c PdfHash.h PdfStandardAtoms.h PdfStrings.h
 PdfImage.o: PdfImage.c PdfImage.h PdfStandardObjects.h PdfStandardAtoms.h PdfDict.h PdfArray.h PdfContentsGenerator.h
 PdfOS.o: PdfOS.c PdfOS.h PdfPlatform.h
