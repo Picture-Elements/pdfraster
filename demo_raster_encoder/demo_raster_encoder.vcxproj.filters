@@ -23,7 +23,7 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="raster_encoder_demo.c">
+    <ClCompile Include="demo_raster_encoder.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
