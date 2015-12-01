@@ -1,11 +1,14 @@
 #include <assert.h>
 
 #include "PdfStandardObjects.h"
+#include "PdfString.h"
 #include "PdfStrings.h"
 #include "PdfStandardAtoms.h"
 #include "PdfDict.h"
 #include "PdfArray.h"
 #include "PdfContentsGenerator.h"
+
+#include "md5.h"
 
 // format unsigned integer n into w characters with leading 0's
 // place at p with trailing NUL and return pointer to that NUL.
@@ -26,26 +29,35 @@ char* pdatoulz(char* p, pduint32 n, int w)
 	return p;
 }
 
-t_pdvalue pd_make_time_string(t_pdallocsys *alloc, time_t t)
+void pd_get_time_string(time_t t, char szText[32])
 {
-	char szText[200];
 	struct tm *tmp = localtime(&t);
 	// As a side effect, localtime sets global 'timezone'
-	// to offset from localtime to UTC in seconds
-	// We want the offset from UTC to local, and in minutes:
+	// to offset from localtime to UTC in seconds.
+	// We want the offset FROM UTC to local, and in minutes:
+	// "A PLUS SIGN as the value of the O field signifies that local time is now and later than UT,
+	// a HYPHEN - MINUS signifies that local time is earlier than UT, ..." [ISO PDF 2.0 DIS]
 	long UTCoff = -timezone / 60;
 	char chSign = '+';
 	if (UTCoff < 0) {
 		chSign = '-'; UTCoff = -UTCoff;
 	}
-	else if (UTCoff == 0) chSign = 'Z';
-	strftime(szText, sizeof(szText), "(D:%Y%m%d%H%M%S", tmp);
+	//else if (UTCoff == 0) chSign = 'Z';		// is this necessary or right?
+	// Note - strftime is in theory affected by the current locale but
+	// the conversion specifiers we use here are locale-independent.
+	strftime(szText, 32, "D:%Y%m%d%H%M%S", tmp);
+	// append offset to local time from UTC in the form <sign>HH'mm
 	char* p = szText + pdstrlen(szText);
 	*p++ = chSign;
 	p = pdatoulz(p, UTCoff / 60, 2);
 	*p++ = '\'';
 	p = pdatoulz(p, UTCoff % 60, 2);
-	pd_strcpy(p, 3, "')");
+}
+
+t_pdvalue pd_make_time_string(t_pdallocsys *alloc, time_t t)
+{
+	char szText[32];
+	pd_get_time_string(t, szText);
 	return pdcstrvalue(alloc, szText);
 }
 
@@ -58,169 +70,116 @@ t_pdvalue pd_make_now_string(t_pdallocsys *alloc)
 
 t_pdvalue pd_catalog_new(t_pdallocsys *alloc, t_pdxref *xref)
 {
-	t_pdvalue catdict = dict_new(alloc, 20);
-	t_pdvalue pagesdict = dict_new(alloc, 3);
-	dict_put(catdict, PDA_TYPE, pdatomvalue(PDA_CATALOG));
-	dict_put(catdict, PDA_PAGES, pd_xref_makereference(xref, pagesdict));
+	t_pdvalue catdict = pd_dict_new(alloc, 20);
+	t_pdvalue pagesdict = pd_dict_new(alloc, 3);
+	pd_dict_put(catdict, PDA_Type, pdatomvalue(PDA_Catalog));
+	pd_dict_put(catdict, PDA_Pages, pd_xref_makereference(xref, pagesdict));
 
-	dict_put(pagesdict, PDA_TYPE, pdatomvalue(PDA_PAGES));
-	dict_put(pagesdict, PDA_KIDS, pdarrayvalue(pd_array_new(alloc, 10)));
-	dict_put(pagesdict, PDA_COUNT, pdintvalue(0));
+	pd_dict_put(pagesdict, PDA_Type, pdatomvalue(PDA_Pages));
+	pd_dict_put(pagesdict, PDA_Kids, pdarrayvalue(pd_array_new(alloc, 10)));
+	pd_dict_put(pagesdict, PDA_Count, pdintvalue(0));
 
 	return pd_xref_makereference(xref, catdict);
 }
 
-t_pdvalue pd_info_new(t_pdallocsys *alloc, t_pdxref *xref, char *title, char *author, char *subject, char *keywords, char *creator, char *producer)
+t_pdvalue pd_info_new(t_pdallocsys *alloc, t_pdxref *xref)
 {
-	t_pdvalue infodict = dict_new(alloc, 8);
-	dict_put(infodict, PDA_TYPE, pdatomvalue(PDA_INFO));
-	if (title)
-		dict_put(infodict, PDA_TITLE, pdcstrvalue(alloc, title));
-	if (author)
-		dict_put(infodict, PDA_AUTHOR, pdcstrvalue(alloc, author));
-	if (subject)
-		dict_put(infodict, PDA_SUBJECT, pdcstrvalue(alloc, subject));
-	if (keywords)
-		dict_put(infodict, PDA_KEYWORDS, pdcstrvalue(alloc, keywords));
-	if (creator)
-		dict_put(infodict, PDA_CREATOR, pdcstrvalue(alloc, creator));
-	if (producer)
-		dict_put(infodict, PDA_PRODUCER, pdcstrvalue(alloc, producer));
+	t_pdvalue infodict = pd_dict_new(alloc, 8);
 	return pd_xref_makereference(xref, infodict);
+}
+
+static pdbool hash_string_value(t_pdatom atom, t_pdvalue value, void *cookie)
+{
+	if (IS_STRING(value)) {
+		MD5_CTX* md5 = (MD5_CTX*)cookie;
+		t_pdstring *str = value.value.stringvalue;
+		MD5_Update(md5, pd_string_data(str), pd_string_length(str));
+	}
+	return PD_TRUE;
+}
+
+t_pdvalue pd_generate_file_id(t_pdallocsys *alloc, t_pdvalue info)
+{
+	// Construct the current document ID (an MD5 hash key)
+	// We use only the string-valued entries in the DID.
+	MD5_CTX md5;
+	MD5_Init(&md5);
+	// hash all the string values in the Info dictionary into the MD5 hash:
+	pd_dict_foreach(info, hash_string_value, &md5);
+	// get the 16-byte MD5 digest:
+	unsigned char digest[16];
+	MD5_Final(digest, &md5);
+	// make a 2-element array
+	t_pdarray *file_id = pd_array_new(alloc, 2);
+	// containing the hash as a binary string, twice
+	pd_array_add(file_id, pdstringvalue(pd_string_new(alloc, digest, sizeof digest, PD_TRUE)));
+	pd_array_add(file_id, pdstringvalue(pd_string_new(alloc, digest, sizeof digest, PD_TRUE)));
+	// TODO: don't encrypt the ID array!
+	//pd_dont_encrypt(file_id);
+	return pdarrayvalue(file_id);
 }
 
 t_pdvalue pd_trailer_new(t_pdallocsys *alloc, t_pdxref *xref, t_pdvalue catalog, t_pdvalue info)
 {
-	t_pdvalue trailer = dict_new(alloc, 4);
-	dict_put(trailer, PDA_SIZE, pdintvalue(pd_xref_size(xref)));
-	dict_put(trailer, PDA_ROOT, catalog);
+	t_pdvalue trailer = pd_dict_new(alloc, 4);
+	pd_dict_put(trailer, PDA_Size, pdintvalue(pd_xref_size(xref)));
+	pd_dict_put(trailer, PDA_Root, catalog);
 	if (!IS_ERR(info))
-		dict_put(trailer, PDA_INFO, info);
+		pd_dict_put(trailer, PDA_Info, info);
 	return trailer;
-}
-
-static t_pdatom ToCompressionAtom(e_ImageCompression comp)
-{
-	switch (comp) {
-	default:
-	case kCompNone: return PDA_NONE;
-	case kCompFlate: return PDA_FLATEDECODE;
-	case kCompCCITT: return PDA_CCITTFAXDECODE;
-	case kCompDCT: return PDA_DCTDECODE;
-	case kCompJBIG2: return PDA_JBIG2DECODE;
-	case kCompJPX: return PDA_JPXDECODE;
-	}
-}
-
-t_pdvalue pd_image_new(t_pdallocsys *alloc, t_pdxref *xref, f_on_datasink_ready ready, void *eventcookie,
-	t_pdvalue width, t_pdvalue height, t_pdvalue bitspercomponent, e_ImageCompression comp, t_pdvalue compParms, t_pdvalue colorspace)
-{
-	t_pdvalue image = stream_new(alloc, xref, 10, ready, eventcookie);
-	t_pdarray *filter, *filterparms;
-	if (IS_ERR(image)) return image;
-	dict_put(image, PDA_TYPE, pdatomvalue(PDA_XOBJECT));
-	dict_put(image, PDA_SUBTYPE, pdatomvalue(PDA_IMAGE));
-	dict_put(image, PDA_WIDTH, width);
-	dict_put(image, PDA_HEIGHT, height);
-	dict_put(image, PDA_BITSPERCOMPONENT, bitspercomponent);
-	filter = pd_array_new(alloc, 1);
-	if (comp != kCompNone)
-	{
-		pd_array_add(filter, pdatomvalue(ToCompressionAtom(comp)));
-		dict_put(image, PDA_FILTER, pdarrayvalue(filter));
-		filterparms = pd_array_new(alloc, 1);
-		if (!IS_NULL(compParms))
-			pd_array_add(filterparms, compParms);
-		dict_put(image, PDA_DECODEPARMS, pdarrayvalue(filterparms));
-	}
-	dict_put(image, PDA_COLORSPACE, colorspace);
-	dict_put(image, PDA_LENGTH, pd_xref_makereference(xref, pdintvalue(0)));
-
-	return image;
-}
-
-static pdint32 ToK(e_CCITTKind kind)
-{
-	switch (kind)
-	{
-	default:
-	case kCCIITTG4: return -1;
-	case kCCITTG31D: return 0;
-	case kCCITTG32D: return 1;
-	}
-}
-
-static t_pdvalue MakeCCITTParms(t_pdallocsys *alloc, pduint32 width, pduint32 height, e_CCITTKind kind, pdbool ccittBlackIs1)
-{
-	t_pdvalue parms = dict_new(alloc, 4);
-	dict_put(parms, PDA_K, pdintvalue(ToK(kind)));
-	dict_put(parms, PDA_COLUMNS, pdintvalue(width));
-	dict_put(parms, PDA_ROWS, pdintvalue(height));
-	dict_put(parms, PDA_BLACKIS1, pdboolvalue(ccittBlackIs1));
-	return parms;
-}
-
-static t_pdatom ToColorSpaceAtom(e_ColorSpace cs)
-{
-	switch (cs)
-	{
-	default: /* TODO FAIL */
-	case kDeviceGray: return PDA_DEVICEGRAY;
-	case kDeviceRgb: return PDA_DEVICERGB;
-	case kDeviceCmyk: return PDA_DEVICECMYK;
-	}
-}
-
-t_pdvalue pd_image_new_simple(t_pdallocsys *alloc, t_pdxref *xref, f_on_datasink_ready ready, void *eventcookie,
-	pduint32 width, pduint32 height, pduint32 bitspercomponent, e_ImageCompression comp, e_CCITTKind kind, pdbool ccittBlackIs1, e_ColorSpace colorspace)
-{
-	t_pdvalue cs = pdatomvalue(ToColorSpaceAtom(colorspace));
-	t_pdvalue comparms = comp == kCompCCITT ? MakeCCITTParms(alloc, width, height, kind, ccittBlackIs1) : pdnullvalue();
-	return pd_image_new(alloc, xref, ready, eventcookie, pdintvalue(width), pdintvalue(height), pdintvalue(bitspercomponent),
-		comp, comparms, cs);
 }
 
 t_pdvalue pd_page_new_simple(t_pdallocsys *alloc, t_pdxref *xref, t_pdvalue catalog, double width, double height)
 {
 	pdbool succ;
-	t_pdvalue pagedict = dict_new(alloc, 20);
-	t_pdvalue pagesdict = dict_get(catalog, PDA_PAGES, &succ); /* this is a reference */
-	t_pdvalue resources = dict_new(alloc, 1);
+	t_pdvalue pagedict = pd_dict_new(alloc, 20);
+	t_pdvalue pagesdict = pd_dict_get(catalog, PDA_Pages, &succ); /* this is a reference */
+	t_pdvalue resources = pd_dict_new(alloc, 1);
 	assert(IS_REFERENCE(pagesdict));
 
-	dict_put(pagedict, PDA_TYPE, pdatomvalue(PDA_PAGE));
-	dict_put(pagedict, PDA_PARENT, pagesdict);
-	dict_put(pagedict, PDA_MEDIABOX, pdarrayvalue(pd_array_buildfloats(alloc, 4, 0.0, 0.0, width, height)));
-	dict_put(pagedict, PDA_RESOURCES, resources);
-	dict_put(resources, PDA_XOBJECT, dict_new(alloc, 20));
+	pd_dict_put(pagedict, PDA_Type, pdatomvalue(PDA_Page));
+	pd_dict_put(pagedict, PDA_Parent, pagesdict);
+	pd_dict_put(pagedict, PDA_MediaBox, pdarrayvalue(pd_array_buildfloats(alloc, 4, 0.0, 0.0, width, height)));
+	pd_dict_put(pagedict, PDA_Resources, resources);
+	pd_dict_put(resources, PDA_XObject, pd_dict_new(alloc, 20));
 	return pd_xref_makereference(xref, pagedict);
 }
 
 void pd_catalog_add_page(t_pdvalue catalog, t_pdvalue page)
 {
 	pdbool succ;
-	t_pdvalue pagesdict = dict_get(catalog, PDA_PAGES, &succ); /* this is a reference */
-	t_pdvalue kidsarr = dict_get(pagesdict, PDA_KIDS, &succ);
-	t_pdvalue count = dict_get(pagesdict, PDA_COUNT, &succ);
+	t_pdvalue pagesdict = pd_dict_get(catalog, PDA_Pages, &succ); /* this is a reference */
+	t_pdvalue kidsarr = pd_dict_get(pagesdict, PDA_Kids, &succ);
+	t_pdvalue count = pd_dict_get(pagesdict, PDA_Count, &succ);
 	assert(IS_REFERENCE(pagesdict));
-	assert(IS_DICT(pd_reference_get_value(pagesdict.value.refvalue)));
+	assert(IS_DICT(pd_reference_get_value(pagesdict)));
 	assert(IS_ARRAY(kidsarr));
 	assert(IS_INT(count));
 	// append the new page to the /Kids array
 	pd_array_add(kidsarr.value.arrvalue, page);
 	// increment the total page count
-	dict_put(pagesdict, PDA_COUNT, pdintvalue(count.value.intvalue + 1));
+	pd_dict_put(pagesdict, PDA_Count, pdintvalue(count.value.intvalue + 1));
 }
 
 t_pdvalue pd_contents_new(t_pdallocsys *alloc, t_pdxref *xref, t_pdcontents_gen *gen)
 {
 	t_pdvalue contents = stream_new(alloc, xref, 0, pd_contents_generate, gen);
-	dict_put(contents, PDA_LENGTH, pd_xref_makereference(xref, pdintvalue(0)));
+	pd_dict_put(contents, PDA_Length, pd_xref_create_forward_reference(xref));
 	return contents;
 }
 
 void pd_page_add_image(t_pdvalue page, t_pdatom imageatom, t_pdvalue image)
 {
 	pdbool succ;
-	dict_put(dict_get(dict_get(page, PDA_RESOURCES, &succ), PDA_XOBJECT, &succ), imageatom, image);
+	pd_dict_put(pd_dict_get(pd_dict_get(page, PDA_Resources, &succ), PDA_XObject, &succ), imageatom, image);
+}
+
+t_pdvalue pd_metadata_new(t_pdallocsys *alloc, t_pdxref *xref, f_on_datasink_ready ready, void *eventcookie)
+{
+	t_pdvalue metadata = stream_new(alloc, xref, 3, ready, eventcookie);
+	if (IS_ERR(metadata)) return metadata;
+	pd_dict_put(metadata, PDA_Type, pdatomvalue(PDA_Metadata));
+	pd_dict_put(metadata, PDA_Subtype, pdatomvalue(PDA_XML));
+	pd_dict_put(metadata, PDA_Length, pd_xref_create_forward_reference(xref));
+	return metadata;
 }

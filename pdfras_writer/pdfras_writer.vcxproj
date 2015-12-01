@@ -55,6 +55,7 @@
       <SDLCheck>true</SDLCheck>
       <CompileAs>CompileAsC</CompileAs>
       <DisableSpecificWarnings>4996</DisableSpecificWarnings>
+      <AdditionalIncludeDirectories>$(SolutionDir)icc_profile</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -72,6 +73,7 @@
       <SDLCheck>true</SDLCheck>
       <CompileAs>CompileAsC</CompileAs>
       <DisableSpecificWarnings>4996</DisableSpecificWarnings>
+      <AdditionalIncludeDirectories>$(SolutionDir)icc_profile</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -81,6 +83,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="md5.h" />
     <ClInclude Include="PdfAlloc.h" />
     <ClInclude Include="PdfArray.h" />
     <ClInclude Include="PdfAtoms.h" />
@@ -88,9 +91,10 @@
     <ClInclude Include="PdfDatasink.h" />
     <ClInclude Include="PdfDict.h" />
     <ClInclude Include="PdfHash.h" />
+    <ClInclude Include="PdfImage.h" />
     <ClInclude Include="PdfOS.h" />
     <ClInclude Include="PdfPlatform.h" />
-    <ClInclude Include="PdfElements.h" />
+    <ClInclude Include="PdfValues.h" />
     <ClInclude Include="PdfRaster.h" />
     <ClInclude Include="PdfStandardAtoms.h" />
     <ClInclude Include="PdfStandardObjects.h" />
@@ -100,14 +104,16 @@
     <ClInclude Include="PdfXrefTable.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="md5.c" />
     <ClCompile Include="PdfAlloc.c" />
     <ClCompile Include="PdfArray.c" />
     <ClCompile Include="PdfAtoms.c" />
     <ClCompile Include="PdfContentsGenerator.c" />
     <ClCompile Include="PdfDatasink.c" />
     <ClCompile Include="PdfDict.c" />
-    <ClCompile Include="PdfElements.c" />
+    <ClCompile Include="PdfValues.c" />
     <ClCompile Include="PdfHash.c" />
+    <ClCompile Include="PdfImage.c" />
     <ClCompile Include="PdfOS.c" />
     <ClCompile Include="PdfRaster.c" />
     <ClCompile Include="PdfStandardObjects.c" />

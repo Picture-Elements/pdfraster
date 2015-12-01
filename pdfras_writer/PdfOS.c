@@ -20,6 +20,11 @@ extern char *pditoa(pdint32 i)
 	char *s = itoabuf + kMAX_DIGITS + 1;
 	*s = '\0';
 	if (neg) i = -i;
+	if (i < 0) {
+		// there is one value that can't be negated...
+		*--s = '8';
+		i = 214748364;
+	}
 	do
 	{
 		*--s = (i % 10) + '0';
@@ -30,19 +35,11 @@ extern char *pditoa(pdint32 i)
 	return s;
 }
 
-//#define PRECISION 0.00000000000001
-#define MAX_FLOAT_STRING_SIZE 80
-
-/* see http://stackoverflow.com/a/7097567/20481 */
-/**
-* Double to ASCII
-*/
-static char __fbuf[MAX_FLOAT_STRING_SIZE];
-
 char * pdftoa(pddouble n) {
 	return pdftoaprecision(n, 0.00000000000001);
 }
 
+static char __fbuf[1076];
 
 char * pdftoaprecision(pddouble n, pddouble precision) {
 	/* handle special cases */
@@ -64,72 +61,41 @@ char * pdftoaprecision(pddouble n, pddouble precision) {
 		__fbuf[1] = '\0';
 	}
 	else {
-		int digit, m, m1;
-		char *c = __fbuf;
-		int neg = (n < 0);
-		if (neg)
+		char intPart_reversed[311];
+		int i = 0, charCount = 0;
+		double fp_int, fp_frac;
+
+		if (n < 0) {
+			__fbuf[charCount++] = '-';
 			n = -n;
-		// calculate magnitude
-		m = (int)log10(n);
-		int useExp = (m >= 14 || (neg && m >= 9) || m <= -9);
-		if (neg)
-			*(c++) = '-';
-		// set up for scientific notation
-		if (useExp) {
-			if (m < 0)
-				m -= 1;
-			n = (pdfloat32)(n / pow(10.0, m));
-			m1 = m;
-			m = 0;
 		}
-		if (m < 1.0) {
-			m = 0;
+
+		fp_frac = modf(n, &fp_int); // Separate integer/fractional parts
+
+		while (fp_int > 0) // Convert integer part, if any
+		{
+			intPart_reversed[i++] = '0' + (int)fmod(fp_int, 10);
+			fp_int = floor(fp_int / 10);
 		}
-		// convert the number
-		while (n > precision || m >= 0) {
-			double weight = pow(10.0, m);
-			if (weight > 0 && !pdisinf(weight)) {
-				digit = (int)floor(n / weight);
-				n -= (pdfloat32)(digit * weight);
-				*(c++) = '0' + digit;
-			}
-			if (m == 0 && n > 0)
-				*(c++) = '.';
-			m--;
+
+		for (i = 0; i < charCount; i++) {
+			//Reverse the integer part, if any
+			__fbuf[charCount++] = intPart_reversed[--i];
 		}
-		if (useExp) {
-			// convert the exponent
-			int i, j;
-			*(c++) = 'e';
-			if (m1 > 0) {
-				*(c++) = '+';
+
+		if (fp_int != 0) {
+			__fbuf[charCount++] = '.'; //Decimal point
+
+			while (fp_frac > 0 && precision < 1.0) // Convert fractional part, if any
+			{
+				fp_frac *= 10;
+				fp_frac = modf(fp_frac, &fp_int);
+				__fbuf[charCount++] = '0' + (int)fp_int;
+				precision *= 10;
 			}
-			else {
-				*(c++) = '-';
-				m1 = -m1;
-			}
-			m = 0;
-			while (m1 > 0) {
-				*(c++) = '0' + m1 % 10;
-				m1 /= 10;
-				m++;
-			}
-			c -= m;
-			for (i = 0, j = m - 1; i<j; i++, j--) {
-				// swap without temporary
-				c[i] ^= c[j];
-				c[j] ^= c[i];
-				c[i] ^= c[j];
-			}
-			c += m;
 		}
-		*(c) = '\0';
+
+		__fbuf[charCount] = 0; //String terminator
 	}
 	return __fbuf;
-}
-
-char hexdigit(int c)
-{
-	static char *digits = "0123456789ABCDEF";
-	return digits[c & 0xf];
 }

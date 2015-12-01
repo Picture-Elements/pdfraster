@@ -7,8 +7,10 @@
 #include "PdfAtoms.h"
 #include "PdfStandardAtoms.h"
 #include "PdfString.h"
+#include "PdfStrings.h"
 #include "PdfXrefTable.h"
 #include "PdfStandardObjects.h"
+#include "PdfImage.h"
 #include "PdfArray.h"
 
 // Version of the file format we 
@@ -19,21 +21,24 @@ typedef struct t_pdfrasencoder {
 	int					apiLevel;			// caller's specified API level.
 	t_pdoutstream*		stm;				// output PDF stream
 	void *				writercookie;
-	// document info
-	char*				keywords;
-	char*				creator;			// name of application creating the PDF
-	char*				producer;			// name of PDF writing module
-	// internal PDF structures
+	time_t				creationDate;
+	t_pdatomtable*		atoms;				// the atom table/dictionary
+	// standard document objects
 	t_pdxref*			xref;
 	t_pdvalue			catalog;
+	t_pdvalue			info;
+	// optional document objects
+	t_pdvalue			srgbColorspace;		// ICCBased sRGB colorspace
 	// current page object and related values
 	t_pdvalue			currentPage;
 	double				xdpi;				// horizontal resolution, pixels/inch
 	double				ydpi;				// vertical resolution, pixels/inch
 	int					rotation;			// page rotation (degrees clockwise)
 	RasterPixelFormat	pixelFormat;		// how pixels are represented
+	pdbool				devColor;			// use uncalibrated (device) colorspace
 	int					width;				// image width in pixels
 	RasterCompression	compression;		// how data is compressed
+	int					strips;				// number of strips on current page
 	int					height;				// total pixel height of current page
 	int					phys_pageno;		// physical page number
 	int					page_front;			// front/back/unspecified
@@ -56,7 +61,7 @@ char *pdstrdup(const char* s, struct t_pdallocsys *pool)
 }
 
 
-t_pdfrasencoder* pd_raster_encoder_create(int apiLevel, t_OS *os)
+t_pdfrasencoder* pdfr_encoder_create(int apiLevel, t_OS *os)
 {
 	struct t_pdallocsys *pool;
 
@@ -77,36 +82,89 @@ t_pdfrasencoder* pd_raster_encoder_create(int apiLevel, t_OS *os)
 	t_pdfrasencoder *enc = (t_pdfrasencoder *)pd_alloc(pool, sizeof(t_pdfrasencoder));
 	if (enc)
 	{
-		enc->pool = pool;
-		enc->apiLevel = apiLevel;
+		enc->pool = pool;						// associated allocation pool
+		enc->apiLevel = apiLevel;				// level of this API assumed by caller
 		enc->stm = pd_outstream_new(pool, os);
-		// fill in various defaults
-		enc->keywords = NULL;
-		enc->creator = NULL;
-		enc->producer = "PdfRaster encoder " PDFRAS_LIBRARY_VERSION;
-		// default resolution
-		enc->xdpi = enc->ydpi = 42;
 
+		enc->xdpi = enc->ydpi = 300;			// default
+		enc->rotation = 0;						// default (& redundant)
+		enc->compression = PDFRAS_UNCOMPRESSED;	// default
+		enc->pixelFormat = PDFRAS_BITONAL;		// default
+		// initial atom table
+		enc->atoms = pd_atom_table_new(pool, 128);
+		// empty cross-reference table:
 		enc->xref = pd_xref_new(pool);
+		// initial document catalog:
 		enc->catalog = pd_catalog_new(pool, enc->xref);
+		
+		// create 'info' dictionary
+		enc->info = pd_info_new(pool, enc->xref);
+		// default Producer
+		pd_dict_put(enc->info, PDA_Producer, pdcstrvalue(pool, "PdfRaster encoder " PDFRAS_LIBRARY_VERSION));
+		// record creation date & time:
+		time(&enc->creationDate);
+		pd_dict_put(enc->info, PDA_CreationDate, pd_make_time_string(pool, enc->creationDate));
+		// we don't modify PDF so there is no ModDate
+
 		// Write the PDF header, with the PDF/raster 2nd line comment:
 		pd_write_pdf_header(enc->stm, "1.4", "%\xAE\xE2\x9A\x86" "er-" PDFRASTER_SPEC_VERSION "\n");
 	}
 	return enc;
 }
 
-void pd_raster_set_creator(t_pdfrasencoder *enc, const char* creator)
+void pdfr_encoder_set_creator(t_pdfrasencoder *enc, const char* creator)
 {
-	if (enc->creator) {
-		pd_free(enc->pool, enc->creator);
-		enc->creator = NULL;
-	}
-	if (creator) {
-		enc->creator = pdstrdup(creator, enc->pool);
-	}
+	pd_dict_put(enc->info, PDA_Creator, pdcstrvalue(enc->pool, creator));
 }
 
-void pd_raster_set_resolution(t_pdfrasencoder *enc, double xdpi, double ydpi)
+void pdfr_encoder_set_author(t_pdfrasencoder *enc, const char* author)
+{
+	pd_dict_put(enc->info, PDA_Author, pdcstrvalue(enc->pool, author));
+}
+
+void pdfr_encoder_set_title(t_pdfrasencoder *enc, const char* title)
+{
+	pd_dict_put(enc->info, PDA_Title, pdcstrvalue(enc->pool, title));
+}
+
+void pdfr_encoder_set_subject(t_pdfrasencoder *enc, const char* subject)
+{
+	pd_dict_put(enc->info, PDA_Subject, pdcstrvalue(enc->pool, subject));
+}
+
+void pdfr_encoder_set_keywords(t_pdfrasencoder *enc, const char* keywords)
+{
+	pd_dict_put(enc->info, PDA_Keywords, pdcstrvalue(enc->pool, keywords));
+}
+
+void f_write_string(t_datasink *sink, void *eventcookie)
+{
+	const char* xmpdata = (const char*)eventcookie;
+	pd_datasink_put(sink, xmpdata, 0, pdstrlen(xmpdata));
+}
+
+void pdfr_encoder_get_creation_date(t_pdfrasencoder *enc, time_t *t)
+{
+	*t = enc->creationDate;
+}
+
+void pdfr_encoder_write_document_xmp(t_pdfrasencoder *enc, const char* xmpdata)
+{
+	t_pdvalue xmpstm = pd_metadata_new(enc->pool, enc->xref, f_write_string, (void*)xmpdata);
+	// flush the metadata stream to output immediately
+	pd_write_reference_declaration(enc->stm, xmpstm);
+	pd_dict_put(enc->catalog, PDA_Metadata, xmpstm);
+}
+
+void pdfr_encoder_write_page_xmp(t_pdfrasencoder *enc, const char* xmpdata)
+{
+	t_pdvalue xmpstm = pd_metadata_new(enc->pool, enc->xref, f_write_string, (void*)xmpdata);
+	// flush the metadata stream to output immediately
+	pd_write_reference_declaration(enc->stm, xmpstm);
+	pd_dict_put(enc->currentPage, PDA_Metadata, xmpstm);
+}
+
+void pdfr_encoder_set_resolution(t_pdfrasencoder *enc, double xdpi, double ydpi)
 {
 	enc->xdpi = xdpi;
 	enc->ydpi = ydpi;
@@ -115,7 +173,7 @@ void pd_raster_set_resolution(t_pdfrasencoder *enc, double xdpi, double ydpi)
 // Set the rotation for current and subsequent pages.
 // Values that are not multiple of 90 are *ignored*.
 // Valid values are mapped into the range 0, 90, 180, 270.
-void pd_raster_set_rotation(t_pdfrasencoder* enc, int degCW)
+void pdfr_encoder_set_rotation(t_pdfrasencoder* enc, int degCW)
 {
 	while (degCW < 0) degCW += 360;
 	if (degCW % 90 == 0) {
@@ -123,16 +181,30 @@ void pd_raster_set_rotation(t_pdfrasencoder* enc, int degCW)
 	}
 }
 
-int pd_raster_encoder_start_page(t_pdfrasencoder* enc, RasterPixelFormat format, RasterCompression comp, int width)
+void pdfr_encoder_set_pixelformat(t_pdfrasencoder* enc, RasterPixelFormat format)
+{
+	enc->pixelFormat = format;
+}
+
+void pdfr_encoder_set_compression(t_pdfrasencoder* enc, RasterCompression comp)
+{
+	enc->compression = comp;
+}
+
+void pdfr_encoder_set_device_colorspace(t_pdfrasencoder* enc, int devColor)
+{
+	enc->devColor = (devColor != 0);
+}
+
+int pdfr_encoder_start_page(t_pdfrasencoder* enc, int width)
 {
 	if (IS_DICT(enc->currentPage)) {
-		pd_raster_encoder_end_page(enc);
+		pdfr_encoder_end_page(enc);
 		assert(IS_NULL(enc->currentPage));
 	}
-	enc->pixelFormat = format;
-	enc->compression = comp;
 	enc->width = width;
-	enc->height = 0;				// unknown until strips are written
+	enc->strips = 0;				// number of strips written to current page
+	enc->height = 0;				// height of current page so far
 
 	// per-page metadata:
 	enc->phys_pageno = -1;			// unspecified
@@ -146,12 +218,12 @@ int pd_raster_encoder_start_page(t_pdfrasencoder* enc, RasterPixelFormat format,
 	return 0;
 }
 
-void pd_raster_set_physical_page_number(t_pdfrasencoder* enc, int phpageno)
+void pdfr_encoder_set_physical_page_number(t_pdfrasencoder* enc, int phpageno)
 {
 	enc->phys_pageno = phpageno;
 }
 
-void pd_raster_set_page_front(t_pdfrasencoder* enc, int frontness)
+void pdfr_encoder_set_page_front(t_pdfrasencoder* enc, int frontness)
 {
 	enc->page_front = frontness;
 }
@@ -165,15 +237,65 @@ typedef struct {
 static void onimagedataready(t_datasink *sink, void *eventcookie)
 {
 	t_stripinfo* pinfo = (t_stripinfo*)eventcookie;
-	pd_datasink_begin(sink);
 	pd_datasink_put(sink, pinfo->data, 0, pinfo->count);
-	pd_datasink_end(sink);
-	pd_datasink_free(sink);
 }
 
-int pd_raster_encoder_write_strip(t_pdfrasencoder* enc, int rows, const pduint8 *buf, size_t len)
+t_pdvalue pdfr_encoder_get_srgb_colorspace(t_pdfrasencoder* enc)
 {
-	e_ColorSpace colorspace = enc->pixelFormat >= PDFRAS_RGB24 ? kDeviceRgb : kDeviceGray;
+	// Just use a single sRGB colorspace for the entire document,
+	// created when first needed.
+	if (IS_ERR(enc->srgbColorspace)) {
+		t_pdvalue srgb = pd_make_srgb_colorspace(enc->pool, enc->xref);
+		// flush the colorspace profile to the output
+		t_pdvalue profile = pd_array_get(srgb.value.arrvalue, 1);
+		pd_write_reference_declaration(enc->stm, profile);
+		enc->srgbColorspace = srgb;
+	}
+	return enc->srgbColorspace;
+}
+
+t_pdvalue pdfr_encoder_get_calgray_colorspace(t_pdfrasencoder* enc)
+{
+	double black[3] = { 0.0, 0.0, 0.0 };
+	// Should this be D65? [0.9505, 1.0000, 1.0890]?  Does it matter?
+	double white[3] = { 1.0, 1.0, 1.0 };
+	double gamma = 2.25;
+	return pd_make_calgray_colorspace(enc->pool, black, white, gamma);
+}
+
+t_pdvalue pdfr_encoder_get_colorspace(t_pdfrasencoder* enc)
+{
+	switch (enc->pixelFormat) {
+	case PDFRAS_RGB24:
+	case PDFRAS_RGB48:
+		// unless told to use device colorspace, use ICC profile colorspace
+		if (enc->devColor) {
+			return pdatomvalue(PDA_DeviceRGB);
+		}
+		else {
+			return pdfr_encoder_get_srgb_colorspace(enc);
+		}
+	case PDFRAS_GRAY8:
+	case PDFRAS_GRAY16:
+	case PDFRAS_BITONAL:
+		// unless told to use device grayscale, use calibrated grayscale
+		if (enc->devColor) {
+			return pdatomvalue(PDA_DeviceGray);
+		}
+		else {
+			return pdfr_encoder_get_calgray_colorspace(enc);
+		}
+	default:
+		break;
+	} // switch
+	return pderrvalue();
+}
+
+int pdfr_encoder_write_strip(t_pdfrasencoder* enc, int rows, const pduint8 *buf, size_t len)
+{
+	t_pdvalue colorspace = pdfr_encoder_get_colorspace(enc);
+	char stripname[12] = "Strip";
+
 	e_ImageCompression comp;
 	switch (enc->compression) {
 	case PDFRAS_CCITTG4:
@@ -207,13 +329,24 @@ int pd_raster_encoder_write_strip(t_pdfrasencoder* enc, int rows, const pduint8 
 		colorspace);
 	// get a reference to this (strip) image
 	t_pdvalue imageref = pd_xref_makereference(enc->xref, image);
-	// add the image to the resources of the current page
-	pd_page_add_image(enc->currentPage, PDA_STRIP0, imageref);
+	pd_strcpy(stripname + 5, ELEMENTS(stripname) - 5, pditoa(enc->strips));
+	// turn strip name into an atom
+	t_pdatom strip = pd_atom_intern(enc->atoms, stripname);
+	// add the image to the resources of the current page, with the given name
+	pd_page_add_image(enc->currentPage, strip, imageref);
 	// flush the image stream
-	pd_write_pdreference_declaration(enc->stm, imageref.value.refvalue);
+	pd_write_reference_declaration(enc->stm, imageref);
+	// adjust total page height:
 	enc->height += rows;
+	// increment strip count:
+	enc->strips++;
 
 	return 0;
+}
+
+int pdfr_encoder_get_page_height(t_pdfrasencoder* enc)
+{
+	return enc->height;
 }
 
 // callback to generate the content text for a page.
@@ -226,20 +359,34 @@ static void content_generator(t_pdcontents_gen *gen, void *cookie)
 	double H = enc->height / enc->ydpi * 72.0;
 	// horizontal (x) offset is always 0 - flush to left edge.
 	double tx = 0;
-	// vertical offset starts at 0? Top of page?
-	// TODO: ty needs to be stepped for each strip
-	double ty = 0;
-	// TODO: draw all strips not just the first
-	pd_gen_gsave(gen);
-	pd_gen_concatmatrix(gen, W, 0, 0, H, tx, ty);
-	pd_gen_xobject(gen, PDA_STRIP0);
-	pd_gen_grestore(gen);
+	// vertical offset starts at top of page
+	double ty = H;
+	pdbool succ;
+	t_pdvalue res = pd_dict_get(enc->currentPage, PDA_Resources, &succ);
+	t_pdvalue xobj = pd_dict_get(res, PDA_XObject, &succ);
+	for (int n = 0; n < enc->strips; n++) {
+		char stripNname[12] = "Strip";
+		pd_strcpy(stripNname + 5, ELEMENTS(stripNname) - 5, pditoa(n));
+		// turn strip name into an atom
+		t_pdatom stripNatom = pd_atom_intern(enc->atoms, stripNname);
+		// find the strip Image resource
+		t_pdvalue img = pd_dict_get(xobj, stripNatom, &succ);
+		// get its /Height
+		t_pdvalue striph = pd_dict_get(img, PDA_Height, &succ);
+		// calculate height in Points
+		double SH = striph.value.intvalue * 72.0 / enc->ydpi;
+		pd_gen_gsave(gen);
+		pd_gen_concatmatrix(gen, W, 0, 0, SH, tx, ty-SH);
+		pd_gen_xobject(gen, stripNatom);
+		pd_gen_grestore(gen);
+		ty -= SH;
+	}
 }
 
 static void update_media_box(t_pdfrasencoder* enc, t_pdvalue page)
 {
 	pdbool success = PD_FALSE;
-	t_pdvalue box = dict_get(page, PDA_MEDIABOX, &success);
+	t_pdvalue box = pd_dict_get(page, PDA_MediaBox, &success);
 	assert(success);
 	assert(IS_ARRAY(box));
 	double W = enc->width / enc->xdpi * 72.0;
@@ -252,24 +399,24 @@ static void write_page_metadata(t_pdfrasencoder* enc)
 {
 	if (enc->page_front >= 0 || enc->phys_pageno >= 0) {
 		t_pdvalue modTime = pd_make_now_string(enc->pool);
-		t_pdvalue privDict = dict_new(enc->pool, 2);
+		t_pdvalue privDict = pd_dict_new(enc->pool, 2);
 		if (enc->phys_pageno >= 0) {
-			dict_put(privDict, PDA_PHYSICALPAGENUMBER, pdintvalue(enc->phys_pageno));
+			pd_dict_put(privDict, PDA_PhysicalPageNumber, pdintvalue(enc->phys_pageno));
 		}
 		if (enc->page_front >= 0) {
-			dict_put(privDict, PDA_FRONTSIDE, pdboolvalue(enc->page_front == 1));
+			pd_dict_put(privDict, PDA_FrontSide, pdboolvalue(enc->page_front == 1));
 		}
-		t_pdvalue appDataDict = dict_new(enc->pool, 2);
-		dict_put(appDataDict, PDA_LASTMODIFIED, modTime);
-		dict_put(appDataDict, PDA_PRIVATE, privDict);
-		t_pdvalue pieceInfo = dict_new(enc->pool, 2);
-		dict_put(pieceInfo, PDA_PDFRASTER, appDataDict);
-		dict_put(enc->currentPage, PDA_PIECEINFO, pieceInfo);
-		dict_put(enc->currentPage, PDA_LASTMODIFIED, modTime);
+		t_pdvalue appDataDict = pd_dict_new(enc->pool, 2);
+		pd_dict_put(appDataDict, PDA_LastModified, modTime);
+		pd_dict_put(appDataDict, PDA_Private, privDict);
+		t_pdvalue pieceInfo = pd_dict_new(enc->pool, 2);
+		pd_dict_put(pieceInfo, PDA_PDFRaster, appDataDict);
+		pd_dict_put(enc->currentPage, PDA_PieceInfo, pieceInfo);
+		pd_dict_put(enc->currentPage, PDA_LastModified, modTime);
 	}
 }
 
-int pd_raster_encoder_end_page(t_pdfrasencoder* enc)
+int pdfr_encoder_end_page(t_pdfrasencoder* enc)
 {
 	if (!IS_NULL(enc->currentPage)) {
 		// create a content generator
@@ -277,18 +424,18 @@ int pd_raster_encoder_end_page(t_pdfrasencoder* enc)
 		// create contents object (stream)
 		t_pdvalue contents = pd_xref_makereference(enc->xref, pd_contents_new(enc->pool, enc->xref, gen));
 		// flush (write) the contents stream
-		pd_write_pdreference_declaration(enc->stm, contents.value.refvalue);
+		pd_write_reference_declaration(enc->stm, contents);
 		// add the contents to the current page
-		dict_put(enc->currentPage, PDA_CONTENTS, contents);
+		pd_dict_put(enc->currentPage, PDA_Contents, contents);
 		// update the media box (we didn't really know the height until now)
 		update_media_box(enc, enc->currentPage);
 		if (enc->rotation != 0) {
-			dict_put(enc->currentPage, PDA_ROTATE, pdintvalue(enc->rotation));
+			pd_dict_put(enc->currentPage, PDA_Rotate, pdintvalue(enc->rotation));
 		}
 		// metadata - add to page if any is specified
 		write_page_metadata(enc);
 		// flush (write) the current page
-		pd_write_pdreference_declaration(enc->stm, enc->currentPage.value.refvalue);
+		pd_write_reference_declaration(enc->stm, enc->currentPage);
 		// add the current page to the catalog (page tree)
 		pd_catalog_add_page(enc->catalog, enc->currentPage);
 		// done with current page:
@@ -297,15 +444,15 @@ int pd_raster_encoder_end_page(t_pdfrasencoder* enc)
 	return 0;
 }
 
-void pd_raster_encoder_end_document(t_pdfrasencoder* enc)
+void pdfr_encoder_end_document(t_pdfrasencoder* enc)
 {
-	pd_raster_encoder_end_page(enc);
-	t_pdvalue info = pd_info_new(enc->pool, enc->xref, "A Tale of Two Cities", "Charles Dickens", "French Revolution", enc->keywords, enc->creator, enc->producer);
-	pd_write_endofdocument(enc->pool, enc->stm, enc->xref, enc->catalog, info);
+	pdfr_encoder_end_page(enc);
+	pd_write_endofdocument(enc->pool, enc->stm, enc->xref, enc->catalog, enc->info);
 	pd_xref_free(enc->xref); enc->xref = NULL;
+	pd_atom_table_free(enc->atoms); enc->atoms = NULL;
 }
 
-void pd_raster_encoder_destroy(t_pdfrasencoder* enc)
+void pdfr_encoder_destroy(t_pdfrasencoder* enc)
 {
 	if (enc) {
 		struct t_pdallocsys *pool = enc->pool;

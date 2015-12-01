@@ -36,17 +36,14 @@ void pd_contents_gen_free(t_pdcontents_gen *gen)
 {
 	if (!gen) return;
 	pd_outstream_free(gen->os);
-	pd_free(gen->alloc, gen);
+	pd_free(gen);
 }
 
 void pd_contents_generate(t_datasink *sink, void *eventcookie)
 {
 	t_pdcontents_gen *gen = (t_pdcontents_gen *)eventcookie;
 	gen->sink = sink;
-	pd_datasink_begin(sink);
 	gen->gen(gen, gen->gencookie);
-	pd_datasink_end(sink);
-	pd_datasink_free(sink);
 }
 
 void pd_gen_moveto(t_pdcontents_gen *gen, pddouble x, pddouble y)
