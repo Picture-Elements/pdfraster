@@ -11,9 +11,10 @@
     </ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
-    <ProjectGuid>{E0066E3C-24A0-43C4-8094-CCC7DA1AD602}</ProjectGuid>
+    <ProjectGuid>{C74CA555-AE5D-4057-B94B-2D13BB8CA27E}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
-    <RootNamespace>raster_encoder_demo</RootNamespace>
+    <RootNamespace>low_level_demo</RootNamespace>
+    <ProjectName>demo_low_level</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -80,11 +81,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="color_page.h" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="bw_ccitt_data.h" />
-    <ClCompile Include="raster_encoder_demo.c" />
+    <ClCompile Include="demo_low_level.c" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

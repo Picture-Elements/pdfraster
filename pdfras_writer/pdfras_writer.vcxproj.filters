@@ -19,9 +19,6 @@
     <ClCompile Include="PdfDict.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="PdfElements.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="PdfHash.c">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -46,6 +43,15 @@
     <ClCompile Include="PdfXrefTable.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="md5.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="PdfImage.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="PdfValues.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="PdfAlloc.h">
@@ -64,9 +70,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="PdfDict.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="PdfElements.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="PdfHash.h">
@@ -97,6 +100,15 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="PdfXrefTable.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="md5.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="PdfImage.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="PdfValues.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

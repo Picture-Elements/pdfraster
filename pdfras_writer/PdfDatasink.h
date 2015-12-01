@@ -2,7 +2,7 @@
 #define _H_PdfDatasink
 #pragma once
 
-#include "PdfElements.h"
+#include "PdfValues.h"
 #include "PdfAlloc.h"
 
 typedef struct t_datasink t_datasink;
