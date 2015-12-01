@@ -2,6 +2,7 @@
 *.o
 *.obj
 *~
+*.exe
 
 pdfras_writer/libpdfras_writer.a
 
