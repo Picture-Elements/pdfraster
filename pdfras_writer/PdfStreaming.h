@@ -2,6 +2,12 @@
 #define _H_PdfStreaming
 #pragma once
 
+// This module implements a logical stream for receiving a PDF file.
+// A t_pdoutstream represents "where to write the PDF".
+// It has the knowledge of how internal PDF objects and values are
+// represented in the actual output.
+// It has special hooks to handle encryption.
+
 #include "PdfAlloc.h"
 #include "PdfValues.h"
 
@@ -11,9 +17,13 @@
 
 typedef struct t_pdoutstream t_pdoutstream;
 typedef struct t_pdxref t_pdxref;
+typedef struct t_pdencrypter t_pdencrypter;
 
 extern t_pdoutstream *pd_outstream_new(t_pdallocsys *allocsys, t_OS *os);
 extern void pd_outstream_free(t_pdoutstream *stm);
+
+// Attach an 'encrypter' to this stream
+extern void pd_outstream_set_encrypter(t_pdoutstream *stm, t_pdencrypter *crypt);
 
 extern void pd_putc(t_pdoutstream *stm, char c);
 
@@ -50,7 +60,7 @@ extern void pd_putfloat(t_pdoutstream *stm, pddouble f);
 // Return the current write offset (position) in the stream
 extern pduint32 pd_outstream_pos(t_pdoutstream *stm);
 
-// Write a t_pdvalue to an output stream.
+/// Write a t_pdvalue to an output stream.
 extern void pd_write_value(t_pdoutstream *stm, t_pdvalue value);
 
 extern void pd_write_reference_declaration(t_pdoutstream *stm, t_pdvalue ref);

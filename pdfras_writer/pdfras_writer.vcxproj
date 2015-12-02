@@ -92,6 +92,7 @@
     <ClInclude Include="PdfImage.h" />
     <ClInclude Include="PdfOS.h" />
     <ClInclude Include="PdfPlatform.h" />
+    <ClInclude Include="PdfSecurityHandler.h" />
     <ClInclude Include="PdfValues.h" />
     <ClInclude Include="PdfRaster.h" />
     <ClInclude Include="PdfStandardAtoms.h" />

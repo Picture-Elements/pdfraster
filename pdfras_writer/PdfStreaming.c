@@ -10,6 +10,7 @@
 
 typedef struct t_pdoutstream {
 	fOutputWriter writer;
+	t_pdencrypter *encrypter;
 	void *writercookie;
 	pduint32 pos;
 } t_pdoutstream;
@@ -29,6 +30,13 @@ t_pdoutstream *pd_outstream_new(t_pdallocsys *pool, t_OS *os)
 void pd_outstream_free(t_pdoutstream *stm)
 {
 	pd_free(stm);			// doesn't mind NULLs
+}
+
+void pd_outstream_set_encrypter(t_pdoutstream *stm, t_pdencrypter *crypt)
+{
+	if (stm) {
+		stm->encrypter = crypt;
+	}
 }
 
 void pd_putc(t_pdoutstream *stm, char c)
@@ -218,6 +226,10 @@ static void stream_resolve_length(t_pdvalue stream, pduint32 len)
 
 static void writestreambody(t_pdoutstream *os, t_pdvalue dict)
 {
+	// TODO: if stream has encryption,
+	// encrypt stream body before/during output.
+	// After any filters.
+
 	// create a datasink wrapper around the Stream and the outstream
 	t_datasink *sink = stream_datasink_new(dict, os);
 	if (sink) {
@@ -237,6 +249,8 @@ static void writestreambody(t_pdoutstream *os, t_pdvalue dict)
 
 static void writedict(t_pdoutstream *os, t_pdvalue dict)
 {
+	// TODO: tricky: don't encrypt the /Encrypt dictionary.
+	// How? Put an encryption-suppression flag on the dictionary?
 	if (IS_DICT(dict)) {
 		pd_puts(os, "<<");
 		pd_dict_foreach(dict, itemwriter, os);
@@ -298,6 +312,9 @@ static pdbool hexiter(pduint32 index, pduint8 c, void *cookie)
 
 static void writestring(t_pdoutstream *stm, t_pdstring *str)
 {
+	// TODO: if stream has encryption,
+	// encrypt string contents before writing.
+	// EXCEPT the strings in the file /ID are never encrypted.
 	if (pd_string_is_binary(str))
 	{	// write using the hex string notation
 		pd_putc(stm, '<');
@@ -334,14 +351,22 @@ void pd_write_value(t_pdoutstream *stm, t_pdvalue value)
 	}
 }
 
+/// Write the definition of a indirect object to an output stream.
+// If ref is not an indirect object OR has already been written, does nothing.
 void pd_write_reference_declaration(t_pdoutstream *stm, t_pdvalue ref)
 {
 	if (stm && IS_REFERENCE(ref)) {
 		// if this indirect object has not already been written
 		if (!pd_reference_is_written(ref)) {
+			// Tell the xref table where this object def starts
 			pd_reference_set_position(ref, pd_outstream_pos(stm));
+			// start definition with: <obj#> <gen#> obj<eol>
 			pd_putint(stm, pd_reference_object_number(ref));
 			pd_puts(stm, " 0 obj\n");
+			// TODO: record the object number and generation number we
+			// are currently writing, in case encryption needs it.
+			// Object definitions don't nest, so it's just the 2 numbers.
+			// Pass those values to the encrypter?
 			pd_write_value(stm, pd_reference_get_value(ref));
 			pd_puts(stm, "\nendobj\n");
 			pd_reference_mark_written(ref);
