@@ -106,9 +106,8 @@ t_pdvalue pd_make_calgray_colorspace(t_pdallocsys *alloc, double black[3], doubl
 	return pdarrayvalue(cs);
 }
 
-static pduint8 sRGB_ICC_profile[] = {
-#include "srgb_icc_profile.h"
-};
+// creates a static byte array named srgb_icc_profile:
+#include "..\icc_profile\srgb_icc_profile.h"
 
 typedef struct {
 	const pduint8*	pointer;
@@ -123,7 +122,7 @@ static void write_data_block(t_datasink *sink, void *eventcookie)
 
 t_pdvalue pd_make_srgb_colorspace(t_pdallocsys *alloc, t_pdxref *xref)
 {
-	return pd_make_iccbased_rgb_colorspace(alloc, xref, sRGB_ICC_profile, sizeof sRGB_ICC_profile);
+	return pd_make_iccbased_rgb_colorspace(alloc, xref, srgb_icc_profile, sizeof srgb_icc_profile);
 }
 
 t_pdvalue pd_make_iccbased_rgb_colorspace(t_pdallocsys *alloc, t_pdxref *xref, const pduint8* prof_data, size_t prof_size)
