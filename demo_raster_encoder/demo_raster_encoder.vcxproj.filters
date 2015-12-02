@@ -15,19 +15,33 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="color_page.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="gray8_page.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-  </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="bw_ccitt_data.h">
-      <Filter>Header Files</Filter>
-    </ClCompile>
     <ClCompile Include="demo_raster_encoder.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="bw_ccitt_page.bin">
+      <Filter>Resource Files</Filter>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="color_page.jpg">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="color_strip0.jpg">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="color_strip1.jpg">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="color_strip2.jpg">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="color_strip3.jpg">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="gray8_page.jpg">
+      <Filter>Resource Files</Filter>
+    </Image>
   </ItemGroup>
 </Project>

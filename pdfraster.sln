@@ -25,6 +25,7 @@ EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "demo_raster_encoder", "demo_raster_encoder\demo_raster_encoder.vcxproj", "{E0066E3C-24A0-43C4-8094-CCC7DA1AD602}"
 	ProjectSection(ProjectDependencies) = postProject
 		{F96F701B-73F9-4BAB-BA84-CEFF8A112289} = {F96F701B-73F9-4BAB-BA84-CEFF8A112289}
+		{B35FE1C3-D922-41BF-BB0B-25AA4E913060} = {B35FE1C3-D922-41BF-BB0B-25AA4E913060}
 	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "icc_profile", "icc_profile\icc_profile.vcxproj", "{AD5F3A73-01AD-43E9-AE82-427840AE23A2}"

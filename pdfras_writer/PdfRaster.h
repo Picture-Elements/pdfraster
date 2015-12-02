@@ -12,7 +12,8 @@ extern "C" {
 
 #define PDFRAS_API_LEVEL	1
 
-#define PDFRAS_LIBRARY_VERSION "0.8"
+#define PDFRAS_LIBRARY_VERSION "0.9"
+// 0.9	spike	2015.12.01	multi-strip working
 // 0.8	spike	2015.09.25	added file ID in trailer dict
 // 0.7	spike	2015.09.17	introducing calibrated vs device colorspaces
 // 0.6	spike	2015.02.13	bugfix! no EOL after the signature comment
@@ -25,10 +26,10 @@ extern "C" {
 // Pixel Formats
 typedef enum {
 	PDFRAS_BITONAL,				// 1-bit per pixel, 0=black
-	PDFRAS_GRAY8,				// 8-bit per pixel, 0=black
-	PDFRAS_GRAY16,				// 16-bit per pixel, 0=black (under discussion)
-	PDFRAS_RGB24,				// 24-bit per pixel, sRGB
-	PDFRAS_RGB48,				// 48-bit per pixel, sRGB (under discussion)
+	PDFRAS_GRAY8,				// 8-bit per pixel, 0=black, calibrated or DeviceGray
+	PDFRAS_GRAY16,				// 16-bit per pixel, 0=black calibrated or DeviceGray
+	PDFRAS_RGB24,				// 24-bit per pixel, sRGB or DeviceRGB
+	PDFRAS_RGB48,				// 48-bit per pixel, sRGB or DeviceRGB
 } RasterPixelFormat;
 
 // Compression Modes

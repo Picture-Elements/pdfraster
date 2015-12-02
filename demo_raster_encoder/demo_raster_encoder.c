@@ -10,6 +10,10 @@
 #include "bw_ccitt_data.h"
 #include "color_page.h"
 #include "gray8_page.h"
+#include "color_strip0.h"
+#include "color_strip1.h"
+#include "color_strip2.h"
+#include "color_strip3.h"
 
 #define OUTPUT_FILENAME "raster.pdf"
 
@@ -208,7 +212,7 @@ void write_bitonal_ccitt_page(t_pdfrasencoder* enc)
 	pdfr_encoder_start_page(enc, 2521);
 	pdfr_encoder_set_pixelformat(enc, PDFRAS_BITONAL);
 	pdfr_encoder_set_compression(enc, PDFRAS_CCITTG4);
-	pdfr_encoder_write_strip(enc, 3279, bw_ccitt_data, sizeof bw_ccitt_data);
+	pdfr_encoder_write_strip(enc, 3279, bw_ccitt_page_bin, sizeof bw_ccitt_page_bin);
 	pdfr_encoder_end_page(enc);
 }
 
@@ -289,7 +293,7 @@ void write_gray8_jpeg_page(t_pdfrasencoder* enc)
 	pdfr_encoder_set_pixelformat(enc, PDFRAS_GRAY8);
 	pdfr_encoder_set_compression(enc, PDFRAS_JPEG);
 	// write a strip of raster data to the current page
-	pdfr_encoder_write_strip(enc, 1100, gray_page_jpg, sizeof gray_page_jpg);
+	pdfr_encoder_write_strip(enc, 1100, gray8_page_jpg, sizeof gray8_page_jpg);
 	// the page is done
 	pdfr_encoder_end_page(enc);
 }
@@ -371,6 +375,10 @@ void write_rgb24_uncomp_page(t_pdfrasencoder* enc)
 	pdfr_encoder_set_pixelformat(enc, PDFRAS_RGB24);
 	pdfr_encoder_set_compression(enc, PDFRAS_UNCOMPRESSED);
 	pdfr_encoder_write_strip(enc, 100, (pduint8*)colorData, sizeof colorData);
+	if (pdfr_encoder_get_page_height(enc) != 100) {
+		fprintf(stderr, "wrong page height at end of write_rgb24_uncomp_page");
+		exit(1);
+	}
 	pdfr_encoder_end_page(enc);
 }
 
@@ -406,7 +414,7 @@ void write_rgb24_uncomp_multistrip_page(t_pdfrasencoder* enc)
 	size_t stripsize = 175 * 3 * stripheight;
 
 	pdfr_encoder_set_resolution(enc, 50.0, 50.0);
-	pdfr_encoder_set_rotation(enc, 0);
+	pdfr_encoder_set_rotation(enc, 90);
 	pdfr_encoder_start_page(enc, 175);
 	pdfr_encoder_set_pixelformat(enc, PDFRAS_RGB24);
 	pdfr_encoder_set_compression(enc, PDFRAS_UNCOMPRESSED);
@@ -544,18 +552,14 @@ void write_rgb24_jpeg_multistrip_page(t_pdfrasencoder* enc)
 	pdfr_encoder_start_page(enc, 850);
 	pdfr_encoder_set_pixelformat(enc, PDFRAS_RGB24);
 	pdfr_encoder_set_compression(enc, PDFRAS_JPEG);
-	for (int stripno = 0; ; stripno++) {
-		char filename[64];
-		sprintf_s(filename, 64, "color_strip%d.jpg", stripno);
-		FILE *fstrip = fopen(filename, "rb");
-		if (!fstrip) {
-			break;
-		}
-		static pduint8 data[1000000];
-		size_t stripsize = fread(data, 1, sizeof data, fstrip);
-		fclose(fstrip);
-		pdfr_encoder_write_strip(enc, 275, data, stripsize);
-	}
+	// write image as 4 separately compressed strips.
+	// yeah, brute force.
+	pdfr_encoder_write_strip(enc, 275, color_strip0_jpg, sizeof color_strip0_jpg);
+	pdfr_encoder_write_strip(enc, 275, color_strip1_jpg, sizeof color_strip1_jpg);
+	pdfr_encoder_write_strip(enc, 275, color_strip2_jpg, sizeof color_strip2_jpg);
+	pdfr_encoder_write_strip(enc, 275, color_strip3_jpg, sizeof color_strip3_jpg);
+	// All the same height, but that's in no way required.
+
 	if (pdfr_encoder_get_page_height(enc) != 1100) {
 		fprintf(stderr, "wrong page height at end of write_rgb24_jpeg_multistrip_page");
 		exit(1);
@@ -599,8 +603,6 @@ int main(int argc, char** argv)
 
 	generate_image_data();
 
-	//write_rgb24_jpeg_multistrip_file(os, "sample rgb24 jpeg multistrip.pdf");
-
 	write_bitonal_uncompressed_file(os, "sample bw1 uncompressed.pdf");
 
 	write_bitonal_ccitt_file(os, "sample bw1 ccitt.pdf");
@@ -618,6 +620,8 @@ int main(int argc, char** argv)
 	write_rgb24_uncompressed_multistrip_file(os, "sample rgb24 uncompressed multistrip.pdf");
 
 	write_rgb24_jpeg_file(os, "sample rgb24 jpeg.pdf");
+
+	write_rgb24_jpeg_multistrip_file(os, "sample rgb24 jpeg multistrip.pdf");
 
 	write_allformat_multipage_file(os, "sample all formats.pdf");
 
