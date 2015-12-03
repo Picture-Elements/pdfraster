@@ -10,15 +10,17 @@ typedef struct t_pdstring {
 t_pdstring *pd_string_new(t_pdallocsys *pool, const char *string, pduint32 len, pdbool isbinary)
 {
 	t_pdstring *str = NULL;
-	if (pool && string) {
+	if (pool) {
 		str = (t_pdstring *)pd_alloc(pool, sizeof(t_pdstring));
 		if (str) {
 			str->strData = (pduint8 *)pd_alloc(pool, len);
 			if (str->strData)
 			{
 				str->length = len;
-				// attach data to string and set the isBinary field:
-				pd_string_set(str, string, len, isbinary);
+				if (string) {
+					// attach data to string and set the isBinary field:
+					pd_string_set(str, string, len, isbinary);
+				}
 			}
 			else {
 				pd_free(str);
@@ -45,28 +47,43 @@ pduint32 pd_string_length(t_pdstring *str)
 	return str->length;
 }
 
-const pduint8* pd_string_data(t_pdstring *str)
+pduint8* pd_string_data(t_pdstring *str)
 {
 	if (!str) return 0;
 	return str->strData;
 }
 
+pdbool pd_string_set_length(t_pdstring *str, pduint32 len)
+{
+	if (!str) {
+		return PD_FALSE;
+	}
+	if (len != str->length)
+	{
+		// allocate the new data block in same pool as string header
+		pduint8 *newData = (pduint8 *)pd_alloc_same_pool(str, len);
+		if (!newData) {
+			return PD_FALSE;
+		}
+		// free the old data block if any:
+		pd_free(str->strData);
+		// and swap in the new
+		str->strData = newData;
+		str->length = len;
+	}
+	return PD_TRUE;
+}
+
 void pd_string_set(t_pdstring *str, const char *string, pduint32 len, pdbool isbinary)
 {
-	if (str && string) {
-		pduint32 i;
-		if (len != str->length)
-		{
-			// free the current data block if any:
-			pd_free(str->strData);
-			// allocate the new data block in same pool as string header
-			str->strData = (pduint8 *)pd_alloc_same_pool(str, len);
-			str->length = len;
-		}
+	if (str && pd_string_set_length(str, len)) {
 		str->isBinary = isbinary;
-		for (i = 0; i < len; i++)
-		{
-			str->strData[i] = string[i];
+		if (string) {
+			pduint32 i;
+			for (i = 0; i < len; i++)
+			{
+				str->strData[i] = string[i];
+			}
 		}
 	}
 }

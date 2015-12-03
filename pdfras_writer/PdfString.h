@@ -15,7 +15,7 @@ extern void pd_string_free(t_pdstring *str);
 extern pduint32 pd_string_length(t_pdstring *str);
 
 // return a read-only pointer to the data of a string object.
-extern const pduint8* pd_string_data(t_pdstring *str);
+extern pduint8* pd_string_data(t_pdstring *str);
 
 // return the byte at index in the data of a string object
 extern pduint8 pdstring_char_at(t_pdstring *str, pduint32 index);

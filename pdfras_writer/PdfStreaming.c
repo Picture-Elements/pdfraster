@@ -1,12 +1,13 @@
-#include "PdfStreaming.h"
+#include "PdfAlloc.h"
+#include "PdfArray.h"
+#include "PdfAtoms.h"
 #include "PdfDatasink.h"
 #include "PdfDict.h"
-#include "PdfAtoms.h"
 #include "PdfStandardAtoms.h"
+#include "PdfStandardObjects.h"
+#include "PdfStreaming.h"
 #include "PdfString.h"
 #include "PdfXrefTable.h"
-#include "PdfStandardObjects.h"
-#include "PdfArray.h"
 
 typedef struct t_pdoutstream {
 	fOutputWriter writer;
@@ -32,11 +33,38 @@ void pd_outstream_free(t_pdoutstream *stm)
 	pd_free(stm);			// doesn't mind NULLs
 }
 
+///////////////////////////////////////////////////////////////////////
+// Encryption
+
 void pd_outstream_set_encrypter(t_pdoutstream *stm, t_pdencrypter *crypt)
 {
 	if (stm) {
 		stm->encrypter = crypt;
 	}
+}
+
+pdbool pd_stream_is_encrypted(t_pdoutstream *stm)
+{
+	return stm && stm->encrypter ? PD_TRUE : PD_FALSE;
+}
+
+t_pdencrypter* pd_outstream_get_encrypter(t_pdoutstream *stm)
+{
+	return stm ? stm->encrypter : NULL;
+}
+
+t_pdstring* pd_encrypt_string(t_pdoutstream *stm, t_pdstring *str)
+{
+	t_pdencrypter* encrypter = stm->encrypter;
+	t_pdallocsys* pool = __pd_get_pool(str);
+	// calculate encrypted size
+	pduint32 strlen = pd_string_length(str);
+	pduint32 enclen = pd_encrypted_size(encrypter, strlen);
+	// allocate the encrypted string
+	t_pdstring* encstr = pd_string_new(pool, NULL, enclen, PD_TRUE);
+	// encrypt the data from plain string to encrypted string
+	pd_encrypt_data(encrypter, pd_string_data(encstr), pd_string_data(str), strlen);
+	return encstr;
 }
 
 void pd_putc(t_pdoutstream *stm, char c)
@@ -280,11 +308,12 @@ static void writearray(t_pdoutstream *os, t_pdvalue arr)
 	pd_puts(os, " ]");
 }
 
-static void writeesc(t_pdoutstream *stm, pduint8 c)
+static void put_escaped(t_pdoutstream *stm, pduint8 c)
 {
 	pd_putc(stm, '\\');
 	if (c < ' ')
-	{
+	{	// old-school ASCII control character
+		// write octal representation with leading 0.
 		pd_putc(stm, '0');
 		pd_putc(stm, '0' + ((c >> 3) & 7));
 		pd_putc(stm, '0' + (c & 7));
@@ -298,7 +327,7 @@ static pdbool asciter(pduint32 index, pduint8 c, void *cookie)
 {
 	t_pdoutstream *stm = (t_pdoutstream *)cookie;
 	if (c < ' ' || c == '(' || c == ')' || c == '\\')
-		writeesc(stm, c);
+		put_escaped(stm, c);
 	else
 		pd_putc(stm, c);
 	return PD_TRUE;
@@ -310,20 +339,32 @@ static pdbool hexiter(pduint32 index, pduint8 c, void *cookie)
 	return PD_TRUE;
 }
 
+// Write a string to stream as a hexadecimal-style string literal
+static void put_hex_string(t_pdoutstream *stm, t_pdstring *str)
+{
+	pd_putc(stm, '<');
+	pd_string_foreach(str, hexiter, stm);
+	pd_putc(stm, '>');
+}
+
 static void writestring(t_pdoutstream *stm, t_pdstring *str)
 {
-	// TODO: if stream has encryption,
+	// If stream has encryption,
 	// encrypt string contents before writing.
-	// EXCEPT the strings in the file /ID are never encrypted.
-	if (pd_string_is_binary(str))
+	// EXCEPT... the strings in the file /ID are never encrypted.
+	if (pd_stream_is_encrypted(stm)) {
+		// encrypt the string and write it
+		t_pdstring* encstr = pd_encrypt_string(stm, str);
+		put_hex_string(stm, encstr);
+		pd_string_free(encstr);
+	}
+	else if (pd_string_is_binary(str))
 	{	// write using the hex string notation
-		pd_putc(stm, '<');
-		pd_string_foreach(str, hexiter, stm);
-		pd_putc(stm, '>');
+		put_hex_string(stm, str);
 	}
 	else
 	{
-		// write using the ASCII
+		// write using the ASCII notation, escaped as needed.
 		pd_putc(stm, '(');
 		pd_string_foreach(str, asciter, stm);
 		pd_putc(stm, ')');
@@ -351,22 +392,20 @@ void pd_write_value(t_pdoutstream *stm, t_pdvalue value)
 	}
 }
 
-/// Write the definition of a indirect object to an output stream.
-// If ref is not an indirect object OR has already been written, does nothing.
 void pd_write_reference_declaration(t_pdoutstream *stm, t_pdvalue ref)
 {
 	if (stm && IS_REFERENCE(ref)) {
 		// if this indirect object has not already been written
 		if (!pd_reference_is_written(ref)) {
+			pduint32 onr = pd_reference_object_number(ref);
 			// Tell the xref table where this object def starts
 			pd_reference_set_position(ref, pd_outstream_pos(stm));
 			// start definition with: <obj#> <gen#> obj<eol>
-			pd_putint(stm, pd_reference_object_number(ref));
+			pd_putint(stm, onr);
 			pd_puts(stm, " 0 obj\n");
-			// TODO: record the object number and generation number we
-			// are currently writing, in case encryption needs it.
-			// Object definitions don't nest, so it's just the 2 numbers.
-			// Pass those values to the encrypter?
+			if (pd_stream_is_encrypted(stm)) {
+				pd_encrypt_start_object(stm->encrypter, onr, 0);
+			}
 			pd_write_value(stm, pd_reference_get_value(ref));
 			pd_puts(stm, "\nendobj\n");
 			pd_reference_mark_written(ref);
@@ -396,26 +435,37 @@ static pdbool freeTrailerEntry(t_pdatom atom, t_pdvalue value, void *cookie)
 	return PD_TRUE;
 }
 
-void pd_write_endofdocument(t_pdallocsys *alloc, t_pdoutstream *stm, t_pdxref *xref, t_pdvalue catalog, t_pdvalue info)
+void pd_write_endofdocument(t_pdoutstream *stm, t_pdxref *xref, t_pdvalue catalog, t_pdvalue info)
 {
-	t_pdvalue trailer = pd_trailer_new(alloc, xref, catalog, info);
-	// drop the File ID into the trailer dictionary:
+	if (stm) {
+		// use the same storage pool as the stream:
+		t_pdallocsys *pool = __pd_get_pool(stm);
+		// create the trailer dictionary
+		t_pdvalue trailer = pd_trailer_new(pool, xref, catalog, info);
+		// drop the File ID into the trailer dictionary:
+		t_pdvalue file_id = pd_generate_file_id(pool, info);
+		// finally, stuff that 'ID' entry into the trailer
+		pd_dict_put(trailer, PDA_ID, file_id);
 
-	t_pdvalue file_id = pd_generate_file_id(alloc, info);
-	// finally, stuff that 'ID' entry into the trailer
-	pd_dict_put(trailer, PDA_ID, file_id);
+		pd_xref_writeallpendingreferences(xref, stm);
+		// note the position of the XREF table
+		pduint32 pos = pd_outstream_pos(stm);
+		// write the XREF table
+		pd_xref_writetable(xref, stm);
+		// write the trailer dictionary
+		pd_puts(stm, "trailer\n");
+		pd_write_value(stm, trailer);
+		// write the EOF sequence, including pointer to XREF table
+		pd_putc(stm, '\n');
+		pd_puts(stm, "startxref\n");
+		pd_putint(stm, pos);
+		pd_puts(stm, "\n%%EOF\n");
+		// that's the last byte of output!
 
-	pd_xref_writeallpendingreferences(xref, stm);
-	pduint32 pos = pd_outstream_pos(stm);
-	pd_xref_writetable(xref, stm);
-	pd_puts(stm, "trailer\n");
-	pd_write_value(stm, trailer);
-	pd_putc(stm, '\n');
-	pd_puts(stm, "startxref\n");
-	pd_putint(stm, pos);
-	pd_puts(stm, "\n%%EOF\n");
-	// free the stuff that only we know about
-	// namely the file-id array in the trailer dict
-	pd_array_destroy(&file_id);
-	pd_dict_free(trailer);
+		// free the stuff that only we know about
+		// namely the file-id array in the trailer dict
+		pd_array_destroy(&file_id);
+		// and the trailer dict itself
+		pd_dict_free(trailer);
+	}
 }

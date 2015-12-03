@@ -118,7 +118,7 @@ int main(int argc, char **argv)
 	pd_dict_put(info, PDA_Subject, pdcstrvalue(os.allocsys, "French Revolution"));
 
 	pd_write_pdf_header(stm, "1.4", NULL);
-	pd_write_endofdocument(os.allocsys, stm, xref, catalog, info);
+	pd_write_endofdocument(stm, xref, catalog, info);
 
 	pd_xref_free(xref);
 	pd_atom_table_free(atoms);

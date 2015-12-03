@@ -110,6 +110,7 @@
     <ClCompile Include="PdfContentsGenerator.c" />
     <ClCompile Include="PdfDatasink.c" />
     <ClCompile Include="PdfDict.c" />
+    <ClCompile Include="PdfSecurityHandler.c" />
     <ClCompile Include="PdfValues.c" />
     <ClCompile Include="PdfHash.c" />
     <ClCompile Include="PdfImage.c" />

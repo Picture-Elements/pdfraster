@@ -447,7 +447,7 @@ int pdfr_encoder_end_page(t_pdfrasencoder* enc)
 void pdfr_encoder_end_document(t_pdfrasencoder* enc)
 {
 	pdfr_encoder_end_page(enc);
-	pd_write_endofdocument(enc->pool, enc->stm, enc->xref, enc->catalog, enc->info);
+	pd_write_endofdocument(enc->stm, enc->xref, enc->catalog, enc->info);
 	pd_xref_free(enc->xref); enc->xref = NULL;
 	pd_atom_table_free(enc->atoms); enc->atoms = NULL;
 }

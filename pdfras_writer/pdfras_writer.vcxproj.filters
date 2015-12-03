@@ -52,6 +52,9 @@
     <ClCompile Include="PdfValues.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="PdfSecurityHandler.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="PdfAlloc.h">

@@ -12,6 +12,7 @@ O =	md5.c \
 	PdfImage.o \
 	PdfOS.o \
 	PdfRaster.o \
+	PdfSecurityHandler.o \
 	PdfStandardObjects.o \
 	PdfStreaming.o \
 	PdfString.o \
@@ -36,8 +37,9 @@ PdfHash.o: PdfHash.c PdfHash.h PdfStandardAtoms.h PdfStrings.h
 PdfImage.o: PdfImage.c PdfImage.h PdfStandardObjects.h PdfStandardAtoms.h PdfDict.h PdfArray.h PdfContentsGenerator.h
 PdfOS.o: PdfOS.c PdfOS.h PdfPlatform.h
 PdfRaster.o: PdfRaster.c PdfRaster.h PdfDict.h PdfAtoms.h PdfStandardAtoms.h PdfString.h PdfXrefTable.h PdfStandardObjects.h PdfArray.h
+PdfSecurityHandler.o: PdfSecurityHandler.c PdfSecurityHandler.h PdfAlloc.h
 PdfStandardObjects.o: PdfStandardObjects.c PdfStandardObjects.h PdfStrings.h PdfStandardAtoms.h PdfDict.h PdfArray.h PdfContentsGenerator.h
-PdfStreaming.o: PdfStreaming.c PdfStreaming.h PdfDict.h PdfAtoms.h PdfString.h PdfXrefTable.h PdfStandardObjects.h PdfArray.h
+PdfStreaming.o: PdfStreaming.c PdfStreaming.h PdfDict.h PdfAtoms.h PdfString.h PdfXrefTable.h PdfSecurityHandler.h PdfStandardObjects.h PdfArray.h
 PdfString.o: PdfString.c PdfString.h
 PdfStrings.o: PdfStrings.c PdfStrings.h
 PdfValues.o: PdfValues.c PdfValues.h PdfString.h PdfStrings.h PdfDict.h PdfArray.h

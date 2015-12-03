@@ -21,3 +21,7 @@ raster_encoder_demo/raster_encoder_demo
 x64/
 x86/
 **/output.pdf
+demo_raster_encoder/bw_ccitt_data.h
+demo_raster_encoder/color_page.h
+demo_raster_encoder/color_strip?.h
+demo_raster_encoder/gray8_page.h
