@@ -7,7 +7,7 @@
 typedef struct t_pdcontents_gen t_pdcontents_gen;
 typedef void (*f_gen)(t_pdcontents_gen *gen, void *gencookie);
 
-extern t_pdcontents_gen *pd_contents_gen_new(t_pdallocsys *alloc, f_gen gen, void *gencookie);
+extern t_pdcontents_gen *pd_contents_gen_new(t_pdmempool *alloc, f_gen gen, void *gencookie);
 extern void pd_contents_gen_free(t_pdcontents_gen *gen);
 
 extern void pd_contents_generate(t_datasink *sink, void *eventcookie);

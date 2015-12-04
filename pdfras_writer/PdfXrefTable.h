@@ -41,7 +41,7 @@ extern void pd_reference_set_position(t_pdvalue ref, pduint32 pos);
 // XREF tables
 
 // Create a new empty XREF table:
-extern t_pdxref *pd_xref_new(t_pdallocsys *pool);
+extern t_pdxref *pd_xref_new(t_pdmempool *pool);
 
 // Release storage allocated to an XREF table.
 extern void pd_xref_free(t_pdxref *xref);

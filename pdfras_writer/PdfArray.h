@@ -7,7 +7,7 @@
 #include "PdfAlloc.h"
 
 // Allocate and return an array, with specified initial capacity.
-extern t_pdarray *pd_array_new(t_pdallocsys *alloc, pduint32 initialSize);
+extern t_pdarray *pd_array_new(t_pdmempool *alloc, pduint32 initialSize);
 
 // Free an array.
 // Note, does not free any objects referenced by the values in the array.
@@ -55,14 +55,14 @@ extern void pd_array_foreach(t_pdarray *arr, f_pdarray_iterator iter, void *cook
 
 // Create and return an array containing the n variable arguments (of type t_pdvalue).
 // If memory allocation fails, returns the error value.
-extern t_pdarray *pd_array_build(t_pdallocsys *pool, pduint32 n, /* t_pdvalue value, */ ...);
+extern t_pdarray *pd_array_build(t_pdmempool *pool, pduint32 n, /* t_pdvalue value, */ ...);
 
 // Create and return an array containing the n variable arguments (of type pdint32).
 // If memory allocation fails, returns the error value.
-extern t_pdarray *pd_array_buildints(t_pdallocsys *pool, pduint32 n, /* pdint32 value, */ ...);
+extern t_pdarray *pd_array_buildints(t_pdmempool *pool, pduint32 n, /* pdint32 value, */ ...);
 
 // Create and return an array containing the n variable arguments (of type double).
 // If memory allocation fails, returns the error value.
-extern t_pdarray *pd_array_buildfloats(t_pdallocsys *pool, pduint32 n, /* double value, */...);
+extern t_pdarray *pd_array_buildfloats(t_pdmempool *pool, pduint32 n, /* double value, */...);
 
 #endif

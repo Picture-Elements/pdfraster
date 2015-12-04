@@ -87,7 +87,7 @@ void test_alloc()
 
 	printf("allocation pool\n");
 	// memory allocation
-	t_pdallocsys* pool = os.allocsys;
+	t_pdmempool* pool = os.allocsys;
 	assert(pd_get_block_count(pool) == 0);
 	assert(pd_get_bytes_in_use(pool) == 0);
 
@@ -106,7 +106,7 @@ void test_alloc()
 	assert(pd_get_block_size(NULL) == 0);
 
 	// create a second pool
-	t_pdallocsys* pool2 = pd_alloc_sys_new(&os);
+	t_pdmempool* pool2 = pd_alloc_new_pool(&os);
 	// check that it looks OK
 	assert(pool2);
 	assert(pool2 != pool);
@@ -159,7 +159,7 @@ void test_alloc()
 	assert(pd_get_block_size(block21) == 65536);
 	assert(pd_get_block_count(pool2) == 1);
 	assert(pd_get_bytes_in_use(pool2) == 65536);
-	pd_alloc_sys_free(pool2);
+	pd_alloc_free_pool(pool2);
 
 	pd_pool_clean(pool);
 	// and when we're done, there should be nothing in the pool
@@ -310,7 +310,7 @@ void test_pd_strdup()
 void test_byte_output()
 {
 	printf("stream byte output\n");
-	t_pdallocsys* pool = os.allocsys;
+	t_pdmempool* pool = os.allocsys;
 	assert(pd_get_block_count(pool) == 0);
 	assert(pd_get_bytes_in_use(pool) == 0);
 
@@ -365,7 +365,7 @@ void test_byte_output()
 void test_int_output()
 {
 	printf("stream int output\n");
-	t_pdallocsys* pool = os.allocsys;
+	t_pdmempool* pool = os.allocsys;
 	assert(pd_get_block_count(pool) == 0);
 	assert(pd_get_bytes_in_use(pool) == 0);
 
@@ -459,7 +459,7 @@ void test_int_output()
 void test_floating_point_output()
 {
 	printf("stream float/double output\n");
-	t_pdallocsys* pool = os.allocsys;
+	t_pdmempool* pool = os.allocsys;
 	assert(pd_get_block_count(pool) == 0);
 	assert(pd_get_bytes_in_use(pool) == 0);
 
@@ -684,7 +684,7 @@ static void test_time_fns()
 	printf("time functions\n");
 	char sztime[200];
 	time_t t;
-	t_pdallocsys* pool = os.allocsys;
+	t_pdmempool* pool = os.allocsys;
 	assert(pd_get_block_count(pool) == 0);
 	assert(pd_get_bytes_in_use(pool) == 0);
 
@@ -788,7 +788,7 @@ static pdbool iterCheck5(t_pdatom atom, t_pdvalue value, void *cookie)
 void test_hashtables()
 {
 	printf("hashtables\n");
-	t_pdallocsys* pool = os.allocsys;
+	t_pdmempool* pool = os.allocsys;
 	assert(pd_get_block_count(pool) == 0);
 	assert(pd_get_bytes_in_use(pool) == 0);
 
@@ -897,7 +897,7 @@ void test_hashtables()
 void test_atoms()
 {
 	printf("atoms\n");
-	t_pdallocsys* pool = os.allocsys;
+	t_pdmempool* pool = os.allocsys;
 	assert(pd_get_block_count(pool) == 0);
 	assert(pd_get_bytes_in_use(pool) == 0);
 
@@ -946,7 +946,7 @@ void test_atoms()
 void test_dicts()
 {
 	printf("dicts\n");
-	t_pdallocsys* pool = os.allocsys;
+	t_pdmempool* pool = os.allocsys;
 	assert(pd_get_block_count(pool) == 0);
 	assert(pd_get_bytes_in_use(pool) == 0);
 	t_pdoutstream* out = pd_outstream_new(pool, &os);
@@ -1104,7 +1104,7 @@ static pdbool arrayIterStopAfter3(t_pdarray *arr, pduint32 currindex, t_pdvalue 
 void test_arrays()
 {
 	printf("arrays\n");
-	t_pdallocsys* pool = os.allocsys;
+	t_pdmempool* pool = os.allocsys;
 	assert(pd_get_block_count(pool) == 0);
 	assert(pd_get_bytes_in_use(pool) == 0);
 	t_pdoutstream* out = pd_outstream_new(pool, &os);
@@ -1283,7 +1283,7 @@ static void on_datasink_ready(t_datasink *sink, void *eventcookie)
 void test_streams()
 {
 	printf("streams\n");
-	t_pdallocsys* pool = os.allocsys;
+	t_pdmempool* pool = os.allocsys;
 	assert(pd_get_block_count(pool) == 0);
 	assert(pd_get_bytes_in_use(pool) == 0);
 	// create an output stream that writes to the 'output' buffer
@@ -1326,7 +1326,7 @@ void test_streams()
 void test_write_value()
 {
 	printf("writing t_pdvalue's\n");
-	t_pdallocsys* pool = os.allocsys;
+	t_pdmempool* pool = os.allocsys;
 	assert(pd_get_block_count(pool) == 0);
 	assert(pd_get_bytes_in_use(pool) == 0);
 	// create helper objects
@@ -1408,7 +1408,7 @@ void test_write_value()
 void test_xref_tables()
 {
 	printf("Indirect Objects & XREF tables\n");
-	t_pdallocsys* pool = os.allocsys;
+	t_pdmempool* pool = os.allocsys;
 	assert(pd_get_block_count(pool) == 0);
 	assert(pd_get_bytes_in_use(pool) == 0);
 	// create helper objects
@@ -1526,7 +1526,7 @@ void test_xref_tables()
 void test_file_structure()
 {
 	printf("file structure\n");
-	t_pdallocsys* pool = os.allocsys;
+	t_pdmempool* pool = os.allocsys;
 	assert(pd_get_block_count(pool) == 0);
 	assert(pd_get_bytes_in_use(pool) == 0);
 
@@ -1599,7 +1599,7 @@ int main(int argc, char** argv)
 	os.alloc = mymalloc;
 	os.free = free;
 	os.memset = myMemSet;
-	os.allocsys = pd_alloc_sys_new(&os);
+	os.allocsys = pd_alloc_new_pool(&os);
 	os.writeout = myOutputWriter;
 	os.writeoutcookie = &buffer;
 

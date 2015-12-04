@@ -8,7 +8,7 @@
 #include "PdfStreaming.h"
 #include "PdfDatasink.h"
 
-extern t_pdvalue pd_dict_new(t_pdallocsys *allocsys, pdint32 initialsize);
+extern t_pdvalue pd_dict_new(t_pdmempool *allocsys, pdint32 initialsize);
 extern void pd_dict_free(t_pdvalue dict);
 extern pdbool pd_dict_contains(t_pdvalue dict, t_pdatom key);
 extern t_pdvalue pd_dict_get(t_pdvalue dict, t_pdatom key, pdbool *success);
@@ -38,7 +38,7 @@ typedef void(*f_on_datasink_ready)(t_datasink *sink, void *eventcookie);
 // ready is a callback that can generate the contents of the Stream when requested.
 // eventcookie is a cookie to pass to the ready function.
 // <returns>A Reference to the created stream</returns>
-extern t_pdvalue stream_new(t_pdallocsys *pool, t_pdxref *xref, pdint32 initialsize, f_on_datasink_ready ready, void *eventcookie);
+extern t_pdvalue stream_new(t_pdmempool *pool, t_pdxref *xref, pdint32 initialsize, f_on_datasink_ready ready, void *eventcookie);
 
 extern void stream_free(t_pdvalue stream);
 extern void stream_set_on_datasink_ready(t_pdvalue stream, f_on_datasink_ready ready, void *eventcookie);

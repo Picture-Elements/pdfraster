@@ -27,7 +27,7 @@ typedef struct {
 	fOutputWriter writeout;
 	void *writeoutcookie;
 	fMemSet memset;
-	struct t_pdallocsys *allocsys;
+	struct t_pdmempool *allocsys;
 } t_OS;
 
 extern pdint32 pdstrlen(const char *s);

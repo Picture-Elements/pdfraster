@@ -16,7 +16,7 @@ typedef struct t_pdoutstream {
 	pduint32 pos;
 } t_pdoutstream;
 
-t_pdoutstream *pd_outstream_new(t_pdallocsys *pool, t_OS *os)
+t_pdoutstream *pd_outstream_new(t_pdmempool *pool, t_OS *os)
 {
 	t_pdoutstream *stm = (t_pdoutstream *)pd_alloc(pool, sizeof(t_pdoutstream));
 	if (stm)
@@ -56,7 +56,7 @@ t_pdencrypter* pd_outstream_get_encrypter(t_pdoutstream *stm)
 t_pdstring* pd_encrypt_string(t_pdoutstream *stm, t_pdstring *str)
 {
 	t_pdencrypter* encrypter = stm->encrypter;
-	t_pdallocsys* pool = __pd_get_pool(str);
+	t_pdmempool* pool = pd_get_pool(str);
 	// calculate encrypted size
 	pduint32 strlen = pd_string_length(str);
 	pduint32 enclen = pd_encrypted_size(encrypter, strlen);
@@ -240,7 +240,7 @@ void stm_sink_free(void *cookie)
 
 static t_datasink *stream_datasink_new(t_pdoutstream *outstm)
 {
-	t_pdallocsys* pool = __pd_get_pool(outstm);
+	t_pdmempool* pool = pd_get_pool(outstm);
 	return pd_datasink_new(pool, stm_sink_begin, stm_sink_put, stm_sink_end, stm_sink_free, outstm);
 }
 
@@ -444,7 +444,7 @@ void pd_write_endofdocument(t_pdoutstream *stm, t_pdxref *xref, t_pdvalue catalo
 {
 	if (stm) {
 		// use the same storage pool as the stream:
-		t_pdallocsys *pool = __pd_get_pool(stm);
+		t_pdmempool *pool = pd_get_pool(stm);
 		// create the trailer dictionary
 		t_pdvalue trailer = pd_trailer_new(pool, xref, catalog, info);
 		// drop the File ID into the trailer dictionary:

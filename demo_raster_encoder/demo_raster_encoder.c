@@ -188,7 +188,7 @@ int write_bitonal_uncompressed_file(t_OS os, const char *filename)
 		return 1;
 	}
 	os.writeoutcookie = fp;
-	os.allocsys = pd_alloc_sys_new(&os);
+	os.allocsys = pd_alloc_new_pool(&os);
 
 	// Construct a raster PDF encoder
 	t_pdfrasencoder* enc = pdfr_encoder_create(PDFRAS_API_LEVEL, &os);
@@ -225,7 +225,7 @@ int write_bitonal_ccitt_file(t_OS os, const char *filename)
 		return 1;
 	}
 	os.writeoutcookie = fp;
-	os.allocsys = pd_alloc_sys_new(&os);
+	os.allocsys = pd_alloc_new_pool(&os);
 
 	t_pdfrasencoder* enc = pdfr_encoder_create(PDFRAS_API_LEVEL, &os);
 	pdfr_encoder_set_author(enc, "Willy Codewell");
@@ -266,7 +266,7 @@ int write_gray8_uncompressed_file(t_OS os, const char *filename)
 		return 1;
 	}
 	os.writeoutcookie = fp;
-	os.allocsys = pd_alloc_sys_new(&os);
+	os.allocsys = pd_alloc_new_pool(&os);
 
 	t_pdfrasencoder* enc = pdfr_encoder_create(PDFRAS_API_LEVEL, &os);
 	pdfr_encoder_set_creator(enc, "raster_encoder_demo 1.0");
@@ -307,7 +307,7 @@ int write_gray8_jpeg_file(t_OS os, const char *filename, int devColor)
 		return 1;
 	}
 	os.writeoutcookie = fp;
-	os.allocsys = pd_alloc_sys_new(&os);
+	os.allocsys = pd_alloc_new_pool(&os);
 
 	t_pdfrasencoder* enc = pdfr_encoder_create(PDFRAS_API_LEVEL, &os);
 	pdfr_encoder_set_creator(enc, "raster_encoder_demo 1.0");
@@ -351,7 +351,7 @@ int write_gray16_uncompressed_file(t_OS os, const char *filename)
 		return 1;
 	}
 	os.writeoutcookie = fp;
-	os.allocsys = pd_alloc_sys_new(&os);
+	os.allocsys = pd_alloc_new_pool(&os);
 
 	t_pdfrasencoder* enc = pdfr_encoder_create(PDFRAS_API_LEVEL, &os);
 	pdfr_encoder_set_creator(enc, "raster_encoder_demo 1.0");
@@ -391,7 +391,7 @@ int write_rgb24_uncompressed_file(t_OS os, const char* filename)
 		return 1;
 	}
 	os.writeoutcookie = fp;
-	os.allocsys = pd_alloc_sys_new(&os);
+	os.allocsys = pd_alloc_new_pool(&os);
 
 	t_pdfrasencoder* enc = pdfr_encoder_create(PDFRAS_API_LEVEL, &os);
 	pdfr_encoder_set_creator(enc, "raster_encoder_demo 1.0");
@@ -438,7 +438,7 @@ int write_rgb24_uncompressed_multistrip_file(t_OS os, const char* filename)
 		return 1;
 	}
 	os.writeoutcookie = fp;
-	os.allocsys = pd_alloc_sys_new(&os);
+	os.allocsys = pd_alloc_new_pool(&os);
 
 	t_pdfrasencoder* enc = pdfr_encoder_create(PDFRAS_API_LEVEL, &os);
 	pdfr_encoder_set_creator(enc, "raster_encoder_demo 1.0");
@@ -475,7 +475,7 @@ int write_rgb24_jpeg_file(t_OS os, const char *filename)
 		return 1;
 	}
 	os.writeoutcookie = fp;
-	os.allocsys = pd_alloc_sys_new(&os);
+	os.allocsys = pd_alloc_new_pool(&os);
 
 	t_pdfrasencoder* enc = pdfr_encoder_create(PDFRAS_API_LEVEL, &os);
 	pdfr_encoder_set_creator(enc, "raster_encoder_demo 1.0");
@@ -504,7 +504,7 @@ int write_allformat_multipage_file(t_OS os, const char *filename)
 		return 1;
 	}
 	os.writeoutcookie = fp;
-	os.allocsys = pd_alloc_sys_new(&os);
+	os.allocsys = pd_alloc_new_pool(&os);
 
 	// Construct a raster PDF encoder
 	t_pdfrasencoder* enc = pdfr_encoder_create(PDFRAS_API_LEVEL, &os);
@@ -576,7 +576,7 @@ int write_rgb24_jpeg_multistrip_file(t_OS os, const char* filename)
 		return 1;
 	}
 	os.writeoutcookie = fp;
-	os.allocsys = pd_alloc_sys_new(&os);
+	os.allocsys = pd_alloc_new_pool(&os);
 
 	t_pdfrasencoder* enc = pdfr_encoder_create(PDFRAS_API_LEVEL, &os);
 	pdfr_encoder_set_creator(enc, "raster_encoder_demo 1.0");

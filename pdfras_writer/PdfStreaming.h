@@ -19,7 +19,7 @@
 typedef struct t_pdoutstream t_pdoutstream;
 typedef struct t_pdxref t_pdxref;
 
-extern t_pdoutstream *pd_outstream_new(t_pdallocsys *allocsys, t_OS *os);
+extern t_pdoutstream *pd_outstream_new(t_pdmempool *allocsys, t_OS *os);
 extern void pd_outstream_free(t_pdoutstream *stm);
 
 // Attach an 'encrypter' to this stream.

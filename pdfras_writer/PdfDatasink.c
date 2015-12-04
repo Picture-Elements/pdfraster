@@ -1,7 +1,7 @@
 #include "PdfDatasink.h"
 
 typedef struct t_datasink {
-	t_pdallocsys *alloc;
+	t_pdmempool *alloc;
 	f_sink_begin begin;
 	f_sink_put put;
 	f_sink_end end;
@@ -9,7 +9,7 @@ typedef struct t_datasink {
 	void *cookie;
 } t_datasink;
 
-t_datasink *pd_datasink_new(t_pdallocsys *alloc, f_sink_begin begin, f_sink_put put, f_sink_end end, f_sink_free free, void *cookie)
+t_datasink *pd_datasink_new(t_pdmempool *alloc, f_sink_begin begin, f_sink_put put, f_sink_end end, f_sink_free free, void *cookie)
 {
 	t_datasink *sink = 0;
 	if (begin && end && put && free) {

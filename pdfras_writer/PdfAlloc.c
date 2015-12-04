@@ -3,16 +3,16 @@
 
 struct _t_heapelem;
 
-typedef struct t_pdallocsys {
+typedef struct t_pdmempool {
 	t_OS *os;
 	struct _t_heapelem	*first;		// ptr to first block in use by this pool (or NULL if none)
 	pduint32 alloc_count;			// count of allocated-and-not-yet-freed blocks in this pool
 	size_t	alloc_bytes;			// total bytes currently allocated to blocks in this pool (excluding overhead)
-} t_pdallocsys;
+} t_pdmempool;
 
 typedef struct _t_heapelem
 {
-	t_pdallocsys *pool;			// owning pool
+	t_pdmempool *pool;			// owning pool
 	struct _t_heapelem	*prev;
 	struct _t_heapelem	*next;
 	size_t size;
@@ -22,12 +22,12 @@ typedef struct _t_heapelem
 	pduint8 data[0];
 } t_heapelem;
 
-t_pdallocsys *pd_alloc_sys_new(t_OS *os)
+t_pdmempool *pd_alloc_new_pool(t_OS *os)
 {
-	t_pdallocsys *pool = 0; 
+	t_pdmempool *pool = 0; 
 	if (!os) return 0;
 
-	pool = os->alloc(sizeof(t_pdallocsys));
+	pool = os->alloc(sizeof(t_pdmempool));
 	if (!pool) return NULL;
 	pool->os = os;
 	pool->alloc_count = 0;
@@ -36,12 +36,12 @@ t_pdallocsys *pd_alloc_sys_new(t_OS *os)
 	return pool;
 }
 
-size_t pd_get_block_count(t_pdallocsys* pool)
+size_t pd_get_block_count(t_pdmempool* pool)
 {
 	return pool->alloc_count;
 }
 
-size_t pd_get_bytes_in_use(t_pdallocsys* pool)
+size_t pd_get_bytes_in_use(t_pdmempool* pool)
 {
 	return pool->alloc_bytes;
 }
@@ -56,7 +56,7 @@ void pd_free(void *ptr)
 #endif
 }
 
-t_pdallocsys *__pd_get_pool(void *ptr)
+t_pdmempool *pd_get_pool(void *ptr)
 {
 	if (!ptr) return NULL;
 	int offset = offsetof(t_heapelem, data);
@@ -64,7 +64,7 @@ t_pdallocsys *__pd_get_pool(void *ptr)
 	return elem->pool;
 }
 
-void *__pd_alloc(t_pdallocsys *pool, size_t bytes, char *loc)
+void *__pd_alloc(t_pdmempool *pool, size_t bytes, char *loc)
 {
 
 	if (!pool) return NULL;
@@ -100,7 +100,7 @@ void __pd_free(void *ptr, pdbool validate)
 	if (ptr) {
 		int offset = offsetof(t_heapelem, data);
 		t_heapelem *elem = (t_heapelem *)(((pduint8 *)ptr) - offset);
-		t_pdallocsys *pool = elem->pool;
+		t_pdmempool *pool = elem->pool;
 		if (validate)
 		{
 #if PDDEBUG
@@ -143,7 +143,7 @@ size_t pd_get_block_size(void* block)
 	}
 }
 
-void pd_pool_clean(t_pdallocsys* pool)
+void pd_pool_clean(t_pdmempool* pool)
 {
 	if (pool) {
 		while (pool->first) {
@@ -156,7 +156,7 @@ void pd_pool_clean(t_pdallocsys* pool)
 	}
 }
 
-void pd_alloc_sys_free(t_pdallocsys *pool)
+void pd_alloc_free_pool(t_pdmempool *pool)
 {
 	if (pool) {
 		t_OS *os = pool->os;

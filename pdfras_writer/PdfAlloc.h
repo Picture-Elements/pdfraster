@@ -4,11 +4,11 @@
 
 #include "PdfOS.h"
 
-typedef struct t_pdallocsys t_pdallocsys;
+typedef struct t_pdmempool t_pdmempool;
 
 // Create and return an allocation pool, which sub-manages
 // memory from the underlying 'os' platform.
-extern struct t_pdallocsys *pd_alloc_sys_new(t_OS *os);
+extern struct t_pdmempool *pd_alloc_new_pool(t_OS *os);
 
 // Return a memory block to a pool.
 // ptr = a pointer previously returned by __pd_alloc and not since freed.
@@ -16,17 +16,17 @@ extern struct t_pdallocsys *pd_alloc_sys_new(t_OS *os);
 extern void pd_free(void *ptr);
 
 // Return the number of blocks currently allocated from a pool
-extern size_t pd_get_block_count(t_pdallocsys* pool);
+extern size_t pd_get_block_count(t_pdmempool* pool);
 
 // Return the total bytes currently allocated to blocks a pool.
 // Does not include any overhead, just the sum of the sizes alloc'd and not yet freed.
-extern size_t pd_get_bytes_in_use(t_pdallocsys* pool);
+extern size_t pd_get_bytes_in_use(t_pdmempool* pool);
 
 extern size_t pd_get_block_size(void* block);
 
 // Frees all the blocks in a pool.
 // Same effect as calling pd_free on every outstanding block in the pool.
-extern void pd_pool_clean(t_pdallocsys* pool);
+extern void pd_pool_clean(t_pdmempool* pool);
 
 // (internal) Allocate a block of memory in/from an allocation pool.
 // allocsys = allocation pool to allocate from/in.
@@ -34,11 +34,11 @@ extern void pd_pool_clean(t_pdallocsys* pool);
 // loc = string for tracing/debugging allocations, or NULL.
 // returns: pointer to at least nb bytes of memory not in use for anything else,
 // associated with the allocation pool and filled with 0's.
-extern void *__pd_alloc(t_pdallocsys *allocsys, size_t nb, char *allocatedBy);
+extern void *__pd_alloc(t_pdmempool *allocsys, size_t nb, char *allocatedBy);
 
 // Return the memory pool that a block was allocated from.
 // If ptr is NULL, returns NULL.
-extern t_pdallocsys *__pd_get_pool(void *ptr);
+extern t_pdmempool *pd_get_pool(void *ptr);
 
 // (internal) Return a memory block to a pool.
 // ptr = a pointer previously returned by __pd_alloc and not since freed.
@@ -49,12 +49,12 @@ extern void __pd_free(void *ptr, pdbool veryifyptr);
 // Release an allocation pool.
 // This releases all memory associated with the pool back to the
 // platform underlying the pool.
-extern void pd_alloc_sys_free(t_pdallocsys *sys);
+extern void pd_alloc_free_pool(t_pdmempool *sys);
 
 #define ELEMENTS(a) (sizeof(a)/sizeof((a)[0]))
 
 // do a pd_alloc of bytes from same pool as an existing block
-#define pd_alloc_same_pool(block, bytes) pd_alloc(__pd_get_pool(block), bytes)
+#define pd_alloc_same_pool(block, bytes) pd_alloc(pd_get_pool(block), bytes)
 
 #if PDDEBUG
 #define S1(x) #x

@@ -20,7 +20,7 @@ static t_pdatom ToCompressionAtom(e_ImageCompression comp)
 	}
 }
 
-t_pdvalue pd_image_new(t_pdallocsys *alloc, t_pdxref *xref, f_on_datasink_ready ready, void *eventcookie,
+t_pdvalue pd_image_new(t_pdmempool *alloc, t_pdxref *xref, f_on_datasink_ready ready, void *eventcookie,
 	t_pdvalue width, t_pdvalue height, t_pdvalue bitspercomponent,
 	e_ImageCompression comp, t_pdvalue compParms, t_pdvalue colorspace)
 {
@@ -59,7 +59,7 @@ static pdint32 ToK(e_CCITTKind kind)
 	}
 }
 
-static t_pdvalue MakeCCITTParms(t_pdallocsys *alloc, pduint32 width, pduint32 height, e_CCITTKind kind, pdbool ccittBlackIs1)
+static t_pdvalue MakeCCITTParms(t_pdmempool *alloc, pduint32 width, pduint32 height, e_CCITTKind kind, pdbool ccittBlackIs1)
 {
 	t_pdvalue parms = pd_dict_new(alloc, 4);
 	pd_dict_put(parms, PDA_K, pdintvalue(ToK(kind)));
@@ -71,7 +71,7 @@ static t_pdvalue MakeCCITTParms(t_pdallocsys *alloc, pduint32 width, pduint32 he
 
 // Create & return a CalGray colorspace value
 // with BlackPoint, WhitePoint and Gamma
-t_pdvalue pd_make_calgray_colorspace(t_pdallocsys *alloc, double black[3], double white[3], double gamma)
+t_pdvalue pd_make_calgray_colorspace(t_pdmempool *alloc, double black[3], double white[3], double gamma)
 {
 	// A calibrated grayscale colorspace is an array [/CalGray <<dict>>]
 	// Legal dictionary entries: WhitePoint, BlackPoint and Gamma.
@@ -120,12 +120,12 @@ static void write_data_block(t_datasink *sink, void *eventcookie)
 	pd_datasink_put(sink, block.pointer, 0, block.size);
 }
 
-t_pdvalue pd_make_srgb_colorspace(t_pdallocsys *alloc, t_pdxref *xref)
+t_pdvalue pd_make_srgb_colorspace(t_pdmempool *alloc, t_pdxref *xref)
 {
 	return pd_make_iccbased_rgb_colorspace(alloc, xref, srgb_icc_profile, sizeof srgb_icc_profile);
 }
 
-t_pdvalue pd_make_iccbased_rgb_colorspace(t_pdallocsys *alloc, t_pdxref *xref, const pduint8* prof_data, size_t prof_size)
+t_pdvalue pd_make_iccbased_rgb_colorspace(t_pdmempool *alloc, t_pdxref *xref, const pduint8* prof_data, size_t prof_size)
 {
 	// this has to be dynamically allocated because it needs to stick around after this function returns
 	DataBlock* profile_data = (DataBlock *)pd_alloc(alloc, sizeof(DataBlock));
@@ -148,7 +148,7 @@ t_pdvalue pd_make_iccbased_rgb_colorspace(t_pdallocsys *alloc, t_pdxref *xref, c
 	return pdarrayvalue(cs);
 }
 
-t_pdvalue pd_image_new_simple(t_pdallocsys *alloc, t_pdxref *xref, f_on_datasink_ready ready, void *eventcookie,
+t_pdvalue pd_image_new_simple(t_pdmempool *alloc, t_pdxref *xref, f_on_datasink_ready ready, void *eventcookie,
 	pduint32 width, pduint32 height, pduint32 bitspercomponent, e_ImageCompression comp,
 	e_CCITTKind kind, pdbool ccittBlackIs1, t_pdvalue colorspace)
 {

@@ -10,7 +10,7 @@ typedef struct t_pdarray {
 	t_pdvalue *data;			// storage for entries
 } t_pdarray;
 
-t_pdarray *pd_array_new(t_pdallocsys *pool, pduint32 initialSize)
+t_pdarray *pd_array_new(t_pdmempool *pool, pduint32 initialSize)
 {
 	if (pool) {
 		t_pdarray *arr = (t_pdarray *)pd_alloc(pool, sizeof(t_pdarray));
@@ -179,7 +179,7 @@ void pd_array_foreach(t_pdarray *arr, f_pdarray_iterator iter, void *cookie)
 	}
 }
 
-t_pdarray *pd_array_build(t_pdallocsys *pool, pduint32 n, /* t_pdvalue value, */...)
+t_pdarray *pd_array_build(t_pdmempool *pool, pduint32 n, /* t_pdvalue value, */...)
 {
 	// allocate an array with capacity for n elements
 	t_pdarray *arr = pd_array_new(pool, n);
@@ -199,7 +199,7 @@ t_pdarray *pd_array_build(t_pdallocsys *pool, pduint32 n, /* t_pdvalue value, */
 	return arr;
 }
 
-t_pdarray *pd_array_buildints(t_pdallocsys *pool, pduint32 n, /* pdint32 value, */  ...)
+t_pdarray *pd_array_buildints(t_pdmempool *pool, pduint32 n, /* pdint32 value, */  ...)
 {
 	t_pdarray *arr = pd_array_new(pool, n);
 	if (arr) {
@@ -217,7 +217,7 @@ t_pdarray *pd_array_buildints(t_pdallocsys *pool, pduint32 n, /* pdint32 value, 
 	return arr;
 }
 
-t_pdarray *pd_array_buildfloats(t_pdallocsys *pool, pduint32 n, /* double value, */ ...)
+t_pdarray *pd_array_buildfloats(t_pdmempool *pool, pduint32 n, /* double value, */ ...)
 {
 	t_pdarray *arr = pd_array_new(pool, n);
 	if (arr) {

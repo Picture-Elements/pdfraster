@@ -54,21 +54,21 @@ void pd_get_time_string(time_t t, char szText[32])
 	p = pdatoulz(p, UTCoff % 60, 2);
 }
 
-t_pdvalue pd_make_time_string(t_pdallocsys *alloc, time_t t)
+t_pdvalue pd_make_time_string(t_pdmempool *alloc, time_t t)
 {
 	char szText[32];
 	pd_get_time_string(t, szText);
 	return pdcstrvalue(alloc, szText);
 }
 
-t_pdvalue pd_make_now_string(t_pdallocsys *alloc)
+t_pdvalue pd_make_now_string(t_pdmempool *alloc)
 {
 	time_t t;
 	time(&t);
 	return pd_make_time_string(alloc, t);
 }
 
-t_pdvalue pd_catalog_new(t_pdallocsys *alloc, t_pdxref *xref)
+t_pdvalue pd_catalog_new(t_pdmempool *alloc, t_pdxref *xref)
 {
 	t_pdvalue catdict = pd_dict_new(alloc, 20);
 	t_pdvalue pagesdict = pd_dict_new(alloc, 3);
@@ -82,7 +82,7 @@ t_pdvalue pd_catalog_new(t_pdallocsys *alloc, t_pdxref *xref)
 	return pd_xref_makereference(xref, catdict);
 }
 
-t_pdvalue pd_info_new(t_pdallocsys *alloc, t_pdxref *xref)
+t_pdvalue pd_info_new(t_pdmempool *alloc, t_pdxref *xref)
 {
 	t_pdvalue infodict = pd_dict_new(alloc, 8);
 	return pd_xref_makereference(xref, infodict);
@@ -99,7 +99,7 @@ static pdbool hash_string_value(t_pdatom atom, t_pdvalue value, void *cookie)
 	return PD_TRUE;
 }
 
-t_pdvalue pd_generate_file_id(t_pdallocsys *alloc, t_pdvalue info)
+t_pdvalue pd_generate_file_id(t_pdmempool *alloc, t_pdvalue info)
 {
 	// Construct the current document ID (an MD5 hash key)
 	// We use only the string-valued entries in the DID.
@@ -120,7 +120,7 @@ t_pdvalue pd_generate_file_id(t_pdallocsys *alloc, t_pdvalue info)
 	return pdarrayvalue(file_id);
 }
 
-t_pdvalue pd_trailer_new(t_pdallocsys *alloc, t_pdxref *xref, t_pdvalue catalog, t_pdvalue info)
+t_pdvalue pd_trailer_new(t_pdmempool *alloc, t_pdxref *xref, t_pdvalue catalog, t_pdvalue info)
 {
 	t_pdvalue trailer = pd_dict_new(alloc, 4);
 	pd_dict_put(trailer, PDA_Size, pdintvalue(pd_xref_size(xref)));
@@ -130,7 +130,7 @@ t_pdvalue pd_trailer_new(t_pdallocsys *alloc, t_pdxref *xref, t_pdvalue catalog,
 	return trailer;
 }
 
-t_pdvalue pd_page_new_simple(t_pdallocsys *alloc, t_pdxref *xref, t_pdvalue catalog, double width, double height)
+t_pdvalue pd_page_new_simple(t_pdmempool *alloc, t_pdxref *xref, t_pdvalue catalog, double width, double height)
 {
 	pdbool succ;
 	t_pdvalue pagedict = pd_dict_new(alloc, 20);
@@ -162,7 +162,7 @@ void pd_catalog_add_page(t_pdvalue catalog, t_pdvalue page)
 	pd_dict_put(pagesdict, PDA_Count, pdintvalue(count.value.intvalue + 1));
 }
 
-t_pdvalue pd_contents_new(t_pdallocsys *alloc, t_pdxref *xref, t_pdcontents_gen *gen)
+t_pdvalue pd_contents_new(t_pdmempool *alloc, t_pdxref *xref, t_pdcontents_gen *gen)
 {
 	t_pdvalue contents = stream_new(alloc, xref, 0, pd_contents_generate, gen);
 	pd_dict_put(contents, PDA_Length, pd_xref_create_forward_reference(xref));
@@ -175,7 +175,7 @@ void pd_page_add_image(t_pdvalue page, t_pdatom imageatom, t_pdvalue image)
 	pd_dict_put(pd_dict_get(pd_dict_get(page, PDA_Resources, &succ), PDA_XObject, &succ), imageatom, image);
 }
 
-t_pdvalue pd_metadata_new(t_pdallocsys *alloc, t_pdxref *xref, f_on_datasink_ready ready, void *eventcookie)
+t_pdvalue pd_metadata_new(t_pdmempool *alloc, t_pdxref *xref, f_on_datasink_ready ready, void *eventcookie)
 {
 	t_pdvalue metadata = stream_new(alloc, xref, 3, ready, eventcookie);
 	if (IS_ERR(metadata)) return metadata;

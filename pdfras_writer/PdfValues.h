@@ -56,7 +56,7 @@ extern t_pdvalue pdboolvalue(pdbool v);
 extern t_pdvalue pdfloatvalue(double v);
 extern t_pdvalue pdarrayvalue(t_pdarray *arr);
 extern t_pdvalue pdstringvalue(t_pdstring *str);
-extern t_pdvalue pdcstrvalue(t_pdallocsys *alloc, const char *s);
+extern t_pdvalue pdcstrvalue(t_pdmempool *alloc, const char *s);
 
 #define IS_ERR(v) ((v).pdtype == TPDERRVALUE)
 #define IS_NULL(v) ((v).pdtype == TPDNULL)

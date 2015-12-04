@@ -7,7 +7,7 @@ typedef struct t_pdstring {
 	pduint8 *strData;
 } t_pdstring;
 
-t_pdstring *pd_string_new(t_pdallocsys *pool, const char *string, pduint32 len, pdbool isbinary)
+t_pdstring *pd_string_new(t_pdmempool *pool, const char *string, pduint32 len, pdbool isbinary)
 {
 	t_pdstring *str = NULL;
 	if (pool) {

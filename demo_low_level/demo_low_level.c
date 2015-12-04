@@ -83,7 +83,7 @@ int main(int argc, char **argv)
 	os.alloc = mymalloc;
 	os.free = free;
 	os.memset = myMemSet;
-	os.allocsys = pd_alloc_sys_new(&os);
+	os.allocsys = pd_alloc_new_pool(&os);
 	os.writeout = myOutputWriter;
 	os.writeoutcookie = fp;
 
@@ -122,5 +122,5 @@ int main(int argc, char **argv)
 
 	pd_xref_free(xref);
 	pd_atom_table_free(atoms);
-	pd_alloc_sys_free(os.allocsys);
+	pd_alloc_free_pool(os.allocsys);
 }

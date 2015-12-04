@@ -4,7 +4,7 @@
 
 #include "PdfAlloc.h"
 
-extern char *pd_strdup(t_pdallocsys *alloc, const char *str);
+extern char *pd_strdup(t_pdmempool *alloc, const char *str);
 
 // Copy string from src to dst, writing not more than destlen chars at dst.
 // If dst is NULL or destlen is 0, has absolutely no effect.

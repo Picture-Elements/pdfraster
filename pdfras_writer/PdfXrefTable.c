@@ -99,7 +99,7 @@ typedef struct t_pdxref
 	t_xr *first, *last;
 } t_pdxref;
 
-t_pdxref *pd_xref_new(t_pdallocsys *alloc)
+t_pdxref *pd_xref_new(t_pdmempool *alloc)
 {
 	t_pdxref *xref = (t_pdxref *)pd_alloc(alloc, sizeof(t_pdxref));
 	if (xref) {

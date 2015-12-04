@@ -6,7 +6,7 @@
 #include "PdfValues.h"
 
 // construct a new string object from a constant char string.
-extern t_pdstring *pd_string_new(t_pdallocsys *alloc, const void* string, pduint32 len, pdbool isbinary);
+extern t_pdstring *pd_string_new(t_pdmempool *alloc, const void* string, pduint32 len, pdbool isbinary);
 
 // free a string object
 extern void pd_string_free(t_pdstring *str);

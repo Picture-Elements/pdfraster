@@ -6,7 +6,7 @@ typedef struct t_pdencrypter {
 	pduint32	onr, gen;		// number & generation of current object
 } t_pdencrypter;
 
-t_pdencrypter* pd_encrypt_new(t_pdallocsys* pool, void *cookie)
+t_pdencrypter* pd_encrypt_new(t_pdmempool* pool, void *cookie)
 {
 	t_pdencrypter* crypter = (t_pdencrypter*)pd_alloc(pool, sizeof(t_pdencrypter));
 	if (crypter) {

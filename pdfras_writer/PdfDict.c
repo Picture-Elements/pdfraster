@@ -22,7 +22,7 @@ typedef struct t_pdstream
 
 
 
-t_pdvalue pd_dict_new(t_pdallocsys *allocsys, pdint32 initialsize)
+t_pdvalue pd_dict_new(t_pdmempool *allocsys, pdint32 initialsize)
 {
 	// create the atom->value hashmap underlying the dictionary:
 	t_pdhashatomtovalue *hash = pd_hashatomtovalue_new(allocsys, initialsize);
@@ -127,7 +127,7 @@ void pd_dict_foreach(t_pdvalue dict, f_pdhashatomtovalue_iterator iter, void *co
 ///////////////////////////////////////////////////////////////////////
 // Streams (acts like a derived class of Dictionary)
 
-t_pdvalue stream_new(t_pdallocsys *pool, t_pdxref *xref, pdint32 initialsize, f_on_datasink_ready ready, void *eventcookie)
+t_pdvalue stream_new(t_pdmempool *pool, t_pdxref *xref, pdint32 initialsize, f_on_datasink_ready ready, void *eventcookie)
 {
 	// Allocate the hash map that stores the dictionary entries of the Stream
 	t_pdhashatomtovalue *hash = pd_hashatomtovalue_new(pool, initialsize);

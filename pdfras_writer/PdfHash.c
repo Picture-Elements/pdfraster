@@ -36,7 +36,7 @@ static void init_table(t_pdhashatomtovalue *hash, pduint32 size)
 }
 
 
-t_pdhashatomtovalue *pd_hashatomtovalue_new(t_pdallocsys *pool, pduint32 initialCap)
+t_pdhashatomtovalue *pd_hashatomtovalue_new(t_pdmempool *pool, pduint32 initialCap)
 {
 	t_pdhashatomtovalue *hash = NULL;
 	if (pool) {

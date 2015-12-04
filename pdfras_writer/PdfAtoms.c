@@ -89,7 +89,7 @@ const char *pd_atom_name(t_pdatom atom)
 	return (const char*)atom;
 }
 
-extern t_pdatomtable* pd_atom_table_new(t_pdallocsys* pool, int initialCap)
+extern t_pdatomtable* pd_atom_table_new(t_pdmempool* pool, int initialCap)
 {
 	t_pdatomtable* table = (t_pdatomtable*)pd_alloc(pool, sizeof(t_pdatomtable));
 	if (table) {
@@ -163,7 +163,7 @@ t_pdatom pd_atom_intern(t_pdatomtable* atoms, const char* name)
 		}
 		assert(atoms->elements < atoms->capacity);
 		index = atoms->elements++;
-		atoms->buckets[index] = pd_strdup(__pd_get_pool(atoms), name);
+		atoms->buckets[index] = pd_strdup(pd_get_pool(atoms), name);
 	}
 	return atoms->buckets[index];
 }

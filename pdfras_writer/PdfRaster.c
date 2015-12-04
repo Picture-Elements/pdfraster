@@ -17,7 +17,7 @@
 #define PDFRASTER_SPEC_VERSION "1.0"
 
 typedef struct t_pdfrasencoder {
-	t_pdallocsys*		pool;
+	t_pdmempool*		pool;
 	int					apiLevel;			// caller's specified API level.
 	t_pdoutstream*		stm;				// output PDF stream
 	void *				writercookie;
@@ -47,7 +47,7 @@ typedef struct t_pdfrasencoder {
 
 // utility
 // Allocate and return a copy of string s
-char *pdstrdup(const char* s, struct t_pdallocsys *pool)
+char *pdstrdup(const char* s, struct t_pdmempool *pool)
 {
 	size_t n = pdstrlen(s)+1;
 	char* t = (char*)pd_alloc(pool, n);
@@ -63,7 +63,7 @@ char *pdstrdup(const char* s, struct t_pdallocsys *pool)
 
 t_pdfrasencoder* pdfr_encoder_create(int apiLevel, t_OS *os)
 {
-	struct t_pdallocsys *pool;
+	struct t_pdmempool *pool;
 
 	if (apiLevel < 1) {
 		// TODO: report error
@@ -457,8 +457,8 @@ void pdfr_encoder_end_document(t_pdfrasencoder* enc)
 void pdfr_encoder_destroy(t_pdfrasencoder* enc)
 {
 	if (enc) {
-		struct t_pdallocsys *pool = enc->pool;
-		pd_alloc_sys_free(pool);
+		struct t_pdmempool *pool = enc->pool;
+		pd_alloc_free_pool(pool);
 	}
 }
 

@@ -16,7 +16,7 @@ void pd_strcpy(char *dst, size_t destlen, const char *src)
 }
 
 
-char * pd_strdup(t_pdallocsys *alloc, const char *str)
+char * pd_strdup(t_pdmempool *alloc, const char *str)
 {
 	char* dup = 0;
 	if (str) {

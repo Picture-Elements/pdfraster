@@ -9,7 +9,7 @@
 /* typedef struct t_pdhashatomtovalue t_pdhashatomtovalue; */
 
 // Allocate a new hashtable in pool, with room (initially) for initialCap entries.
-extern t_pdhashatomtovalue *pd_hashatomtovalue_new(t_pdallocsys *pool, pduint32 initialCap);
+extern t_pdhashatomtovalue *pd_hashatomtovalue_new(t_pdmempool *pool, pduint32 initialCap);
 
 // Release a hashtable.
 // Has no effect if table is NULL.
