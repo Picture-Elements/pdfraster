@@ -30,6 +30,11 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "demo_raster_encoder", "demo
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "icc_profile", "icc_profile\icc_profile.vcxproj", "{AD5F3A73-01AD-43E9-AE82-427840AE23A2}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "pdfras_writer_tests", "pdfras_writer_tests\pdfras_writer_tests.vcxproj", "{F49BB4CB-E418-45AF-918D-2BFABC51837E}"
+	ProjectSection(ProjectDependencies) = postProject
+		{F96F701B-73F9-4BAB-BA84-CEFF8A112289} = {F96F701B-73F9-4BAB-BA84-CEFF8A112289}
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32
@@ -64,6 +69,10 @@ Global
 		{AD5F3A73-01AD-43E9-AE82-427840AE23A2}.Debug|Win32.Build.0 = Debug|Win32
 		{AD5F3A73-01AD-43E9-AE82-427840AE23A2}.Release|Win32.ActiveCfg = Release|Win32
 		{AD5F3A73-01AD-43E9-AE82-427840AE23A2}.Release|Win32.Build.0 = Release|Win32
+		{F49BB4CB-E418-45AF-918D-2BFABC51837E}.Debug|Win32.ActiveCfg = Debug|Win32
+		{F49BB4CB-E418-45AF-918D-2BFABC51837E}.Debug|Win32.Build.0 = Debug|Win32
+		{F49BB4CB-E418-45AF-918D-2BFABC51837E}.Release|Win32.ActiveCfg = Release|Win32
+		{F49BB4CB-E418-45AF-918D-2BFABC51837E}.Release|Win32.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

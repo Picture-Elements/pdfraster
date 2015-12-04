@@ -36,8 +36,7 @@ typedef union {
 } u_pdvalue;
 
 typedef struct {
-	int isOptional : 1;
-	t_pdtype pdtype : 7;
+	t_pdtype pdtype;
 	u_pdvalue value;
 } t_pdvalue;
 

@@ -321,7 +321,9 @@ int pdfr_encoder_write_strip(t_pdfrasencoder* enc, int rows, const pduint8 *buf,
 		bitsPerComponent = 8;
 		break;
 	} // switch
-	t_stripinfo stripinfo = { buf, len };
+	t_stripinfo stripinfo;
+	stripinfo.data = buf;
+	stripinfo.count = len;
 	t_pdvalue image = pd_image_new_simple(enc->pool, enc->xref, onimagedataready, &stripinfo,
 		enc->width, rows, bitsPerComponent,
 		comp,

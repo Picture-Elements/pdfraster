@@ -357,7 +357,7 @@ static int token_number(t_pdfrasreader* reader, pduint32 *poff, double* pdvalue)
 			fraction = fraction * 10 + (ch - '0');
 			precision++;
 			ch = nextch(reader, &off);
-		};
+		}
 	}
 	if (digits + precision == 0) {
 		// no digits, not a valid number

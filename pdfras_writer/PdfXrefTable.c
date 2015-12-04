@@ -202,7 +202,8 @@ t_pdvalue pd_xref_create_forward_reference(t_pdxref *xref)
 	if (xref) {
 		t_xr *xr = add_reference(xref, pdnullvalue());
 		if (xr) {
-			t_pdvalue ref = { 0, TPDREFERENCE, { .refvalue = xr->reference } };
+			t_pdvalue ref = { TPDREFERENCE };
+			ref.value.refvalue = xr->reference;
 			return ref;
 		}
 	}
@@ -224,7 +225,8 @@ t_pdvalue pd_xref_makereference(t_pdxref *xref, t_pdvalue value)
 			xr = add_reference(xref, value);
 		}
 		if (xr) {
-			t_pdvalue ref = { 0, TPDREFERENCE, { .refvalue = xr->reference } };
+			t_pdvalue ref = { TPDREFERENCE };
+			ref.value.refvalue = xr->reference;
 			return ref;
 		}
 	}
@@ -267,7 +269,8 @@ void pd_xref_writeallpendingreferences(t_pdxref *xref, t_pdoutstream *os)
 		t_xr *walker;
 		for (walker = xref->first; walker; walker = walker->next)
 		{
-			t_pdvalue ref = { 0, TPDREFERENCE, { .refvalue = walker->reference } };
+			t_pdvalue ref = { TPDREFERENCE };
+			ref.value.refvalue = walker->reference;
 			pd_write_reference_declaration(os, ref);
 		}
 	}

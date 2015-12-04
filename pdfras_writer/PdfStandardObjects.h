@@ -22,6 +22,8 @@ extern t_pdvalue pd_contents_new(t_pdallocsys *alloc, t_pdxref *xref, t_pdconten
 extern void pd_page_add_image(t_pdvalue page, t_pdatom imageatom, t_pdvalue image);
 
 // date/time strings
+
+// Format a PDF-format time string from a time_t.
 void pd_get_time_string(time_t t, char szText[200]);
 
 t_pdvalue pd_make_now_string(t_pdallocsys *alloc);

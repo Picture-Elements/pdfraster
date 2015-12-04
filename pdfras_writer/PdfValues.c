@@ -4,12 +4,13 @@
 #include "PdfDict.h"
 #include "PdfArray.h"
 
-static t_pdvalue __pdnull = { 0, TPDNULL, { 0 } };
-static t_pdvalue __pderr = { 0, TPDERRVALUE, { 0 } };
+static t_pdvalue __pdnull = { TPDNULL, { 0 } };
+static t_pdvalue __pderr = { TPDERRVALUE, { 0 } };
 
 t_pdvalue pdatomvalue(t_pdatom v)
 {
-	t_pdvalue val = { 0, TPDNAME, { .namevalue = v } };
+	t_pdvalue val = { TPDNAME };
+	val.value.namevalue = v;
 	return val;
 }
 
@@ -25,31 +26,36 @@ t_pdvalue pdnullvalue()
 
 t_pdvalue pdintvalue(pdint32 v)
 {
-	t_pdvalue val = { 0, TPDNUMBERINT, { v } };
+	t_pdvalue val = { TPDNUMBERINT };
+	val.value.intvalue = v;
 	return val;
 }
 
 t_pdvalue pdfloatvalue(double v)
 {
-	t_pdvalue val = { 0, TPDNUMBERFLOAT, { .floatvalue = v } };
+	t_pdvalue val = { TPDNUMBERFLOAT };
+	val.value.floatvalue = v;
 	return val;
 }
 
 t_pdvalue pdboolvalue(pdbool v)
 {
-	t_pdvalue val = { 0, TPDBOOL, { .boolvalue = v } };
+	t_pdvalue val = { TPDBOOL };
+	val.value.boolvalue = v;
 	return val;
 }
 
 t_pdvalue pdarrayvalue(t_pdarray *arr)
 {
-	t_pdvalue val = { 0, TPDARRAY, { .arrvalue = arr } };
+	t_pdvalue val = { TPDARRAY };
+	val.value.arrvalue = arr;
 	return val;
 }
 
 t_pdvalue pdstringvalue(t_pdstring *str)
 {
-	t_pdvalue val = { 0, TPDSTRING, { .stringvalue = str } };
+	t_pdvalue val = { TPDSTRING };
+	val.value.stringvalue = str;
 	return val;
 }
 

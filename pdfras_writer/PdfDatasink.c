@@ -41,7 +41,7 @@ void pd_datasink_begin(t_datasink *sink)
 	sink->begin(sink->cookie);
 }
 
-pdbool pd_datasink_put(t_datasink *sink, const pduint8 *data, pduint32 offset, pduint32 len)
+pdbool pd_datasink_put(t_datasink *sink, const void* data, pduint32 offset, size_t len)
 {
 	if (!sink || !data) return PD_FALSE;
 	return sink->put(data, offset, len, sink->cookie);

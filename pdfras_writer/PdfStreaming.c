@@ -70,12 +70,13 @@ t_pdstring* pd_encrypt_string(t_pdoutstream *stm, t_pdstring *str)
 void pd_putc(t_pdoutstream *stm, char c)
 {
 	if (stm) {
-		char __buf[1] = { c };
-		stm->pos += stm->writer(__buf, 0, 1, stm->writercookie);	// data, offset, length, cookie
+		pduint8 buf[1];
+		buf[0] = (pduint8)c;
+		stm->pos += stm->writer(buf, 0, 1, stm->writercookie);	// data, offset, length, cookie
 	}
 }
 
-void pd_putn(t_pdoutstream *stm, const pduint8 *s, pduint32 offset, pduint32 len)
+void pd_putn(t_pdoutstream *stm, const void* s, pduint32 offset, pduint32 len)
 {
 	if (stm) {
 		stm->pos += stm->writer(s, offset, len, stm->writercookie);
@@ -162,7 +163,7 @@ void pd_putfloat(t_pdoutstream *stm, pddouble n)
 			if (decPt-- == 0) pd_putc(stm, '.');
 			int d = (int)floor(n / w);
 			d = (d < 0) ? 0 : (d > 9) ? 9 : d;
-			pd_putc(stm, '0' + d);
+			pd_putc(stm, (char)('0' + d));
 			n -= d * w;
 			if (n == 0 && decPt < 0) break;
 			w /= 10;
@@ -217,7 +218,7 @@ static pdbool itemwriter(t_pdatom key, t_pdvalue value, void *cookie)
 
 static void stm_sink_begin(void *cookie)
 {
-	t_pdoutstream *outstm = (t_pdoutstream *)cookie;
+	(void)cookie;
 }
 
 static pdbool stm_sink_put(const pduint8 *buffer, pduint32 offset, pduint32 len, void *cookie)
@@ -229,15 +230,15 @@ static pdbool stm_sink_put(const pduint8 *buffer, pduint32 offset, pduint32 len,
 
 void stm_sink_end(void *cookie)
 {
-	t_pdoutstream *outstm = (t_pdoutstream *)cookie;
+	(void)cookie;
 }
 
 void stm_sink_free(void *cookie)
 {
-	t_pdoutstream *outstm = (t_pdoutstream *)cookie;
+	(void)cookie;
 }
 
-static t_datasink *stream_datasink_new(t_pdvalue stream, t_pdoutstream *outstm)
+static t_datasink *stream_datasink_new(t_pdoutstream *outstm)
 {
 	t_pdallocsys* pool = __pd_get_pool(outstm);
 	return pd_datasink_new(pool, stm_sink_begin, stm_sink_put, stm_sink_end, stm_sink_free, outstm);
@@ -259,7 +260,7 @@ static void writestreambody(t_pdoutstream *os, t_pdvalue dict)
 	// After any filters.
 
 	// create a datasink wrapper around the Stream and the outstream
-	t_datasink *sink = stream_datasink_new(dict, os);
+	t_datasink *sink = stream_datasink_new(os);
 	if (sink) {
 		pduint32 startpos = pd_outstream_pos(os);
 		pd_puts(os, "\r\nstream\r\n");
@@ -293,6 +294,7 @@ static void writedict(t_pdoutstream *os, t_pdvalue dict)
 
 static pdbool arritemwriter(t_pdarray *arr, pduint32 currindex, t_pdvalue value, void *cookie)
 {
+	(void)arr; (void)currindex;
 	t_pdoutstream *os = (t_pdoutstream *)cookie;
 	if (!os) return PD_FALSE;
 	pd_putc(os, ' ');
@@ -325,6 +327,7 @@ static void put_escaped(t_pdoutstream *stm, pduint8 c)
 
 static pdbool asciter(pduint32 index, pduint8 c, void *cookie)
 {
+	(void)index;
 	t_pdoutstream *stm = (t_pdoutstream *)cookie;
 	if (c < ' ' || c == '(' || c == ')' || c == '\\')
 		put_escaped(stm, c);
@@ -335,6 +338,7 @@ static pdbool asciter(pduint32 index, pduint8 c, void *cookie)
 
 static pdbool hexiter(pduint32 index, pduint8 c, void *cookie)
 {
+	(void)index;
 	pd_puthex((t_pdoutstream *)cookie, c);
 	return PD_TRUE;
 }
@@ -431,6 +435,7 @@ void pd_write_pdf_header(t_pdoutstream *stm, char *version, char *line2)
 
 static pdbool freeTrailerEntry(t_pdatom atom, t_pdvalue value, void *cookie)
 {
+	(void)atom; (void)cookie;
 	pd_value_free(&value);
 	return PD_TRUE;
 }

@@ -30,11 +30,12 @@
 
 /* Any 32-bit or wider unsigned integer data type will do */
 typedef unsigned int MD5_u32plus;
+typedef unsigned char MD5_byte;
 
 typedef struct {
 	MD5_u32plus lo, hi;
 	MD5_u32plus a, b, c, d;
-	unsigned char buffer[64];
+	MD5_byte buffer[64];
 	MD5_u32plus block[16];
 } MD5_CTX;
 

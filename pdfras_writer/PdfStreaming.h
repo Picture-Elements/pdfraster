@@ -43,7 +43,7 @@ extern void pd_puts(t_pdoutstream *stm, char *s);
 extern void pd_puthex(t_pdoutstream *stm, pduint8 b);
 
 // Write n bytes from s+offset to a stream.
-extern void pd_putn(t_pdoutstream *stm, const pduint8 *s, pduint32 offset, pduint32 n);
+extern void pd_putn(t_pdoutstream *stm, const void *s, pduint32 offset, pduint32 n);
 
 // Write a decimal representation of an integer to a stream.
 // All possible values are handled: -2147483648 to 2147483647

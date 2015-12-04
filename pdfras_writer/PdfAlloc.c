@@ -87,6 +87,8 @@ void *__pd_alloc(t_pdallocsys *pool, size_t bytes, char *loc)
 	pool->alloc_bytes += elem->size;
 #if PDDEBUG
 	elem->location = loc;
+#else
+	(void)loc;			// UNUSED
 #endif
 	// fill block with 0's
 	pool->os->memset(elem->data, 0, bytes);
@@ -99,9 +101,9 @@ void __pd_free(void *ptr, pdbool validate)
 		int offset = offsetof(t_heapelem, data);
 		t_heapelem *elem = (t_heapelem *)(((pduint8 *)ptr) - offset);
 		t_pdallocsys *pool = elem->pool;
-#if PDDEBUG
 		if (validate)
 		{
+#if PDDEBUG
 			t_heapelem *walker = pool->first;
 			while (walker)
 			{
@@ -110,8 +112,8 @@ void __pd_free(void *ptr, pdbool validate)
 			}
 			assert(walker);
 			assert(elem == walker);
-		}
 #endif
+		}
 		if (elem == pool->first)
 		{
 			pool->first = elem->prev;

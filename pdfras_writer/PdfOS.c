@@ -74,7 +74,7 @@ char * pdftoaprecision(pddouble n, pddouble precision) {
 
 		while (fp_int > 0) // Convert integer part, if any
 		{
-			intPart_reversed[i++] = '0' + (int)fmod(fp_int, 10);
+			intPart_reversed[i++] = (char)('0' + (int)fmod(fp_int, 10));
 			fp_int = floor(fp_int / 10);
 		}
 
@@ -90,7 +90,7 @@ char * pdftoaprecision(pddouble n, pddouble precision) {
 			{
 				fp_frac *= 10;
 				fp_frac = modf(fp_frac, &fp_int);
-				__fbuf[charCount++] = '0' + (int)fp_int;
+				__fbuf[charCount++] = (char)('0' + (int)fp_int);
 				precision *= 10;
 			}
 		}

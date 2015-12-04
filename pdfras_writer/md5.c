@@ -262,33 +262,33 @@ void MD5_Final(unsigned char *result, MD5_CTX *ctx)
 	memset(&ctx->buffer[used], 0, available - 8);
 
 	ctx->lo <<= 3;
-	ctx->buffer[56] = ctx->lo;
-	ctx->buffer[57] = ctx->lo >> 8;
-	ctx->buffer[58] = ctx->lo >> 16;
-	ctx->buffer[59] = ctx->lo >> 24;
-	ctx->buffer[60] = ctx->hi;
-	ctx->buffer[61] = ctx->hi >> 8;
-	ctx->buffer[62] = ctx->hi >> 16;
-	ctx->buffer[63] = ctx->hi >> 24;
+	ctx->buffer[56] = (MD5_byte)(ctx->lo);
+	ctx->buffer[57] = (MD5_byte)(ctx->lo >> 8);
+	ctx->buffer[58] = (MD5_byte)(ctx->lo >> 16);
+	ctx->buffer[59] = (MD5_byte)(ctx->lo >> 24);
+	ctx->buffer[60] = (MD5_byte)(ctx->hi);
+	ctx->buffer[61] = (MD5_byte)(ctx->hi >> 8);
+	ctx->buffer[62] = (MD5_byte)(ctx->hi >> 16);
+	ctx->buffer[63] = (MD5_byte)(ctx->hi >> 24);
 
 	body(ctx, ctx->buffer, 64);
 
-	result[0] = ctx->a;
-	result[1] = ctx->a >> 8;
-	result[2] = ctx->a >> 16;
-	result[3] = ctx->a >> 24;
-	result[4] = ctx->b;
-	result[5] = ctx->b >> 8;
-	result[6] = ctx->b >> 16;
-	result[7] = ctx->b >> 24;
-	result[8] = ctx->c;
-	result[9] = ctx->c >> 8;
-	result[10] = ctx->c >> 16;
-	result[11] = ctx->c >> 24;
-	result[12] = ctx->d;
-	result[13] = ctx->d >> 8;
-	result[14] = ctx->d >> 16;
-	result[15] = ctx->d >> 24;
+	result[0] = (MD5_byte)(ctx->a);
+	result[1] = (MD5_byte)(ctx->a >> 8);
+	result[2] = (MD5_byte)(ctx->a >> 16);
+	result[3] = (MD5_byte)(ctx->a >> 24);
+	result[4] = (MD5_byte)(ctx->b);
+	result[5] = (MD5_byte)(ctx->b >> 8);
+	result[6] = (MD5_byte)(ctx->b >> 16);
+	result[7] = (MD5_byte)(ctx->b >> 24);
+	result[8] = (MD5_byte)(ctx->c);
+	result[9] = (MD5_byte)(ctx->c >> 8);
+	result[10] = (MD5_byte)(ctx->c >> 16);
+	result[11] = (MD5_byte)(ctx->c >> 24);
+	result[12] = (MD5_byte)(ctx->d);
+	result[13] = (MD5_byte)(ctx->d >> 8);
+	result[14] = (MD5_byte)(ctx->d >> 16);
+	result[15] = (MD5_byte)(ctx->d >> 24);
 
 	memset(ctx, 0, sizeof(*ctx));
 }

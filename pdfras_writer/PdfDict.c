@@ -32,7 +32,8 @@ t_pdvalue pd_dict_new(t_pdallocsys *allocsys, pdint32 initialsize)
 			dict->elems = hash;
 			dict->isStream = PD_FALSE;
 			{
-				t_pdvalue dictvalue = { 0, TPDDICT, { .dictvalue = dict } };
+				t_pdvalue dictvalue = { TPDDICT };
+				dictvalue.value.dictvalue = dict;
 				return dictvalue;
 			}
 		}
@@ -134,7 +135,8 @@ t_pdvalue stream_new(t_pdallocsys *pool, t_pdxref *xref, pdint32 initialsize, f_
 		// Allocate the Stream object, which is a 'derived class' of a t_pddict
 		t_pdstream *stream = (t_pdstream *)pd_alloc(pool, sizeof(t_pdstream));
 		if (stream) {
-			t_pdvalue dictvalue = { 0, TPDDICT, { .dictvalue = &stream->dict } };
+			t_pdvalue dictvalue = { TPDDICT };
+			dictvalue.value.dictvalue = &stream->dict;
 			// plug in the dictionary hash table
 			stream->dict.elems = hash;
 			// mark this as a Stream as well as a Dictionary:

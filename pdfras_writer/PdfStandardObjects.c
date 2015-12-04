@@ -31,13 +31,13 @@ char* pdatoulz(char* p, pduint32 n, int w)
 
 void pd_get_time_string(time_t t, char szText[32])
 {
-	struct tm *tmp = localtime(&t);
-	// As a side effect, localtime sets global 'timezone'
-	// to offset from localtime to UTC in seconds.
-	// We want the offset FROM UTC to local, and in minutes:
+	// Get broken-down local time
+	struct tm tmp = *localtime(&t);
+	// _timezone is offset from localtime to UTC in seconds.
+	// We want the offset FROM UTC to local, in minutes:
 	// "A PLUS SIGN as the value of the O field signifies that local time is now and later than UT,
 	// a HYPHEN - MINUS signifies that local time is earlier than UT, ..." [ISO PDF 2.0 DIS]
-	long UTCoff = -timezone / 60;
+	long UTCoff = -_timezone / 60;
 	char chSign = '+';
 	if (UTCoff < 0) {
 		chSign = '-'; UTCoff = -UTCoff;
@@ -45,7 +45,7 @@ void pd_get_time_string(time_t t, char szText[32])
 	//else if (UTCoff == 0) chSign = 'Z';		// is this necessary or right?
 	// Note - strftime is in theory affected by the current locale but
 	// the conversion specifiers we use here are locale-independent.
-	strftime(szText, 32, "D:%Y%m%d%H%M%S", tmp);
+	strftime(szText, 32, "D:%Y%m%d%H%M%S", &tmp);
 	// append offset to local time from UTC in the form <sign>HH'mm
 	char* p = szText + pdstrlen(szText);
 	*p++ = chSign;
@@ -90,6 +90,7 @@ t_pdvalue pd_info_new(t_pdallocsys *alloc, t_pdxref *xref)
 
 static pdbool hash_string_value(t_pdatom atom, t_pdvalue value, void *cookie)
 {
+	(void)atom;		// unused
 	if (IS_STRING(value)) {
 		MD5_CTX* md5 = (MD5_CTX*)cookie;
 		t_pdstring *str = value.value.stringvalue;
