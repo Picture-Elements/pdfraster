@@ -5,14 +5,23 @@
 #include "PdfAlloc.h"
 #include "PdfValues.h"
 
-// construct a new string object from a constant char string.
-extern t_pdstring *pd_string_new(t_pdmempool *alloc, const void* string, pduint32 len, pdbool isbinary);
+// construct a new (non-binary) string object of length n.
+// if string != NULL, initialize with 1st n chars of string.
+extern t_pdstring *pd_string_new(t_pdmempool *alloc, pduint32 len, const char* string);
+
+// construct a binary string of length n
+// if data != NULL, initialize with 1st n bytes of data.
+extern t_pdstring *pd_string_new_binary(t_pdmempool *pool, pduint32 len, const void* data);
 
 // free a string object
 extern void pd_string_free(t_pdstring *str);
 
 // return the length (in bytes) of a string object.
 extern pduint32 pd_string_length(t_pdstring *str);
+
+// set the length in bytes of a string object to n.
+// the contents of the string become (n bytes of) undefined.
+pdbool pd_string_set_length(t_pdstring *str, pduint32 n);
 
 // return a read-only pointer to the data of a string object.
 extern pduint8* pd_string_data(t_pdstring *str);

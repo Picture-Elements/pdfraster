@@ -10,6 +10,7 @@
 #include "PdfStrings.h"
 #include "PdfString.h"
 #include "PdfAtoms.h"
+#include "PdfContentsGenerator.h"
 #include "PdfHash.h"
 #include "PdfArray.h"
 #include "PdfDict.h"
@@ -943,6 +944,82 @@ void test_atoms()
 	assert(pd_get_bytes_in_use(pool) == 0);
 }
 
+static int jenny;		// variable used just for its address.
+
+static void generate_content(t_pdcontents_gen *gen, void *cookie)
+{
+	// check that we got the expected cookie
+	assert(cookie == &jenny);
+	// create a transient atom table, co-allocated with the gen:
+	t_pdmempool* pool = pd_get_pool(gen);
+	assert(pool);
+	t_pdatomtable* atoms = pd_atom_table_new(pool, 99);
+	assert(atoms);
+	// set up some dummy page content parameters
+	int strips = 2;
+	int W = 1600, H = 2200;
+	int SH = H / strips;
+	int tx = 0, ty = H;
+	// generate simulated page content
+	for (int n = 0; n < strips; n++) {
+		char stripNname[12] = "Strip";
+		pd_strcpy(stripNname + 5, ELEMENTS(stripNname) - 5, pditoa(n));
+		t_pdatom stripNatom = pd_atom_intern(atoms, stripNname);
+		pd_gen_gsave(gen);
+		pd_gen_concatmatrix(gen, W, 0, 0, SH, tx, ty - SH);
+		pd_gen_xobject(gen, stripNatom);
+		pd_gen_grestore(gen);
+		ty -= SH;
+	}
+	pd_atom_table_free(atoms);
+}
+
+static pdbool sink_put(const pduint8 *buffer, pduint32 offset, pduint32 len, void *cookie)
+{
+	t_pdoutstream *outstm = (t_pdoutstream *)cookie;
+	pd_putn(outstm, buffer, offset, len);
+	return PD_TRUE;
+}
+static int sink_free_hit;
+
+static void sink_free(void *cookie)
+{
+	(void)cookie;
+	sink_free_hit++;
+}
+
+void test_contents_generator()
+{
+	printf("content generator\n");
+	t_pdmempool* pool = os.allocsys;
+	assert(pd_get_block_count(pool) == 0);
+	assert(pd_get_bytes_in_use(pool) == 0);
+	t_pdoutstream* out = pd_outstream_new(pool, &os);
+
+	// create a content generator
+	t_pdcontents_gen *gen = pd_contents_gen_new(pool, generate_content, &jenny);
+	// <pretend some time passes...>
+	// set up a sink for the content - writes content to memory stream
+	sink_free_hit = 0;
+	t_datasink* sink = pd_datasink_new(pool, sink_put, sink_free, out);
+	buffer.pos = 0;
+	// generate the content
+	pd_contents_generate(sink, gen);
+	// check correct output generated
+	assert(0 == strcmp(output,
+		" q 1600 0 0 1100 0 1100 cm /Strip0 Do Q q 1600 0 0 1100 0 0 cm /Strip1 Do Q"));
+	// free the sink
+	pd_datasink_free(sink);
+	// the sink's sink_free handler should be called exactly once:
+	assert(sink_free_hit == 1);
+
+	pd_contents_gen_free(gen);
+	pd_outstream_free(out);
+	// and when we're done, there should be nothing in the pool
+	assert(pd_get_block_count(pool) == 0);
+	assert(pd_get_bytes_in_use(pool) == 0);
+}
+
 void test_dicts()
 {
 	printf("dicts\n");
@@ -1237,30 +1314,46 @@ void test_arrays()
 	buffer.pos = 0;
 	pd_write_value(out, array);
 	assert(0 == strcmp(output, "[ 0 1 2 3 ]"));
+	// free the array
+	// (it contains only integer values, no need to free them.)
+	pd_value_free(&array);
 
-	// destroy the array and then build it.
-	pd_array_free(arr);
-	pd_array_build(pool, 3, hello, pdfloatvalue(1.5), pdnullvalue());
+	// create the array fresh from some values
+	arr = pd_array_build(pool, 3, hello, pdfloatvalue(1.5), pdnullvalue());
+	array = pdarrayvalue(arr);
 	buffer.pos = 0;
 	pd_write_value(out, array);
 	assert(0 == strcmp(output, "[ (hello?) 1.5 null ]"));
+	pd_value_free(&array);
 
-	pd_array_free(arr);
-	pd_array_buildints(pool, 5, (1 << 31), 0, 771723882, -950158714, 0xDEAD);
+	arr = pd_array_buildints(pool, 5, (1 << 31), 0, 771723882, -950158714, 0xDEAD);
+	array = pdarrayvalue(arr);
 	buffer.pos = 0;
 	pd_write_value(out, array);
 	assert(0 == strcmp(output, "[ -2147483648 0 771723882 -950158714 57005 ]"));
+	pd_value_free(&array);
 
-	pd_array_free(arr);
-	pd_array_buildfloats(pool, 4, -1.0, 0.0 * -1, 0.376739502, 987654321.5);
+	arr = pd_array_buildfloats(pool, 4, -1.0, 0.0 * -1, 0.376739502, 987654321.5);
+	array = pdarrayvalue(arr);
 	buffer.pos = 0;
 	pd_write_value(out, array);
 	// Note: floats (really doubles) with values that we can represent
 	// exactly as integers, print as integers.
 	// I'm not even sure why we have 'int' values, when we have 64-bit floats.
 	assert(0 == strcmp(output, "[ -1 0 0.376739502 987654321.5 ]"));
+	pd_value_free(&array);
 
-	pd_array_free(arr);
+	// test void pd_array_destroy(t_pdvalue *arr);
+	arr = pd_array_build(pool, 3,
+		pdcstrvalue(pool, "In life,"),
+		pdcstrvalue(pool, "as in art,"),
+		pdcstrvalue(pool, "the beautiful moves in curves."));
+	array = pdarrayvalue(arr);
+	buffer.pos = 0;
+	pd_write_value(out, array);
+	assert(0 == strcmp(output, "[ (In life,) (as in art,) (the beautiful moves in curves.) ]"));
+	pd_array_destroy(&array);
+
 	pd_outstream_free(out);
 	pd_value_free(&hello);
 
@@ -1618,6 +1711,7 @@ int main(int argc, char** argv)
 
 	test_hashtables();
 	test_atoms();
+	test_contents_generator();
 	test_arrays();
 	test_dicts();
 	test_streams();

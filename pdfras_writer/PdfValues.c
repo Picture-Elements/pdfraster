@@ -61,9 +61,8 @@ t_pdvalue pdstringvalue(t_pdstring *str)
 
 t_pdvalue pdcstrvalue(t_pdmempool *alloc, const char *s)
 {
-	t_pdstring *str = pd_string_new(alloc, s, pdstrlen(s), PD_FALSE);
-	if (!str) return pderrvalue();
-	return pdstringvalue(str);
+	t_pdstring *str = pd_string_new(alloc, pdstrlen(s), s);
+	return str ? pdstringvalue(str) : pderrvalue();
 }
 
 int pd_value_eq(t_pdvalue a, t_pdvalue b)

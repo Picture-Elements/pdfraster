@@ -10,7 +10,7 @@
 extern t_pdarray *pd_array_new(t_pdmempool *alloc, pduint32 initialSize);
 
 // Free an array.
-// Note, does not free any objects referenced by the values in the array.
+// Note, does NOT free any objects referenced by the values in the array.
 extern void pd_array_free(t_pdarray *arr);
 
 // free an array along with all the values in the array:

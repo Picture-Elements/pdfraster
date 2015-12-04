@@ -61,7 +61,7 @@ t_pdstring* pd_encrypt_string(t_pdoutstream *stm, t_pdstring *str)
 	pduint32 strlen = pd_string_length(str);
 	pduint32 enclen = pd_encrypted_size(encrypter, strlen);
 	// allocate the encrypted string
-	t_pdstring* encstr = pd_string_new(pool, NULL, enclen, PD_TRUE);
+	t_pdstring* encstr = pd_string_new_binary(pool, enclen, NULL);
 	// encrypt the data from plain string to encrypted string
 	pd_encrypt_data(encrypter, pd_string_data(encstr), pd_string_data(str), strlen);
 	return encstr;
@@ -216,21 +216,11 @@ static pdbool itemwriter(t_pdatom key, t_pdvalue value, void *cookie)
 ///////////////////////////////////////////////////////////////////////
 // stream datasink
 
-static void stm_sink_begin(void *cookie)
-{
-	(void)cookie;
-}
-
 static pdbool stm_sink_put(const pduint8 *buffer, pduint32 offset, pduint32 len, void *cookie)
 {
 	t_pdoutstream *outstm = (t_pdoutstream *)cookie;
 	pd_putn(outstm, buffer, offset, len);
 	return PD_TRUE;
-}
-
-void stm_sink_end(void *cookie)
-{
-	(void)cookie;
 }
 
 void stm_sink_free(void *cookie)
@@ -241,7 +231,7 @@ void stm_sink_free(void *cookie)
 static t_datasink *stream_datasink_new(t_pdoutstream *outstm)
 {
 	t_pdmempool* pool = pd_get_pool(outstm);
-	return pd_datasink_new(pool, stm_sink_begin, stm_sink_put, stm_sink_end, stm_sink_free, outstm);
+	return pd_datasink_new(pool, stm_sink_put, stm_sink_free, outstm);
 }
 
 static void stream_resolve_length(t_pdvalue stream, pduint32 len)

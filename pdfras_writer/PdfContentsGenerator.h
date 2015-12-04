@@ -4,6 +4,7 @@
 
 #include "PdfAlloc.h"
 #include "PdfDatasink.h"
+
 typedef struct t_pdcontents_gen t_pdcontents_gen;
 typedef void (*f_gen)(t_pdcontents_gen *gen, void *gencookie);
 

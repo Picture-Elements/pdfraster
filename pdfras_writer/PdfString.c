@@ -1,32 +1,42 @@
 #include "PdfString.h"
 #include "PdfStrings.h"
 
+#include <string.h>
+
 typedef struct t_pdstring {
 	pdbool isBinary;
 	pduint32 length;
 	pduint8 *strData;
 } t_pdstring;
 
-t_pdstring *pd_string_new(t_pdmempool *pool, const char *string, pduint32 len, pdbool isbinary)
+t_pdstring *pd_string_new_binary(t_pdmempool *pool, pduint32 len, const pduint8* data)
 {
 	t_pdstring *str = NULL;
 	if (pool) {
 		str = (t_pdstring *)pd_alloc(pool, sizeof(t_pdstring));
-		if (str) {
-			str->strData = (pduint8 *)pd_alloc(pool, len);
-			if (str->strData)
-			{
-				str->length = len;
-				if (string) {
-					// attach data to string and set the isBinary field:
-					pd_string_set(str, string, len, isbinary);
-				}
+		if (str && pd_string_set_length(str, len)) {
+			if (data) {
+				// initialize string with data
+				memcpy(str->strData, data, len);
 			}
-			else {
-				pd_free(str);
-				str = NULL;
-			}
+			str->isBinary = PD_TRUE;
 		}
+		else {
+			// string construction failed.
+			// clean up & return NULL.
+			pd_free(str);
+			str = NULL;
+		}
+	}
+	return str;
+}
+
+t_pdstring *pd_string_new(t_pdmempool *pool, pduint32 len, const char *string)
+{
+	t_pdstring *str = pd_string_new_binary(pool, len, (const pduint8*)string);
+	if (str) {
+		// not binary - that's the only difference.
+		str->isBinary = PD_FALSE;
 	}
 	return str;
 }
@@ -47,21 +57,15 @@ pduint32 pd_string_length(t_pdstring *str)
 	return str->length;
 }
 
-pduint8* pd_string_data(t_pdstring *str)
-{
-	if (!str) return 0;
-	return str->strData;
-}
-
-pdbool pd_string_set_length(t_pdstring *str, pduint32 len)
+pdbool pd_string_set_length(t_pdstring *str, pduint32 n)
 {
 	if (!str) {
 		return PD_FALSE;
 	}
-	if (len != str->length)
+	if (str->length != n)
 	{
 		// allocate the new data block in same pool as string header
-		pduint8 *newData = (pduint8 *)pd_alloc_same_pool(str, len);
+		pduint8 *newData = (pduint8 *)pd_alloc_same_pool(str, n);
 		if (!newData) {
 			return PD_FALSE;
 		}
@@ -69,9 +73,15 @@ pdbool pd_string_set_length(t_pdstring *str, pduint32 len)
 		pd_free(str->strData);
 		// and swap in the new
 		str->strData = newData;
-		str->length = len;
+		str->length = n;
 	}
 	return PD_TRUE;
+}
+
+pduint8* pd_string_data(t_pdstring *str)
+{
+	if (!str) return 0;
+	return str->strData;
 }
 
 void pd_string_set(t_pdstring *str, const char *string, pduint32 len, pdbool isbinary)

@@ -56,6 +56,8 @@ extern t_pdvalue pdboolvalue(pdbool v);
 extern t_pdvalue pdfloatvalue(double v);
 extern t_pdvalue pdarrayvalue(t_pdarray *arr);
 extern t_pdvalue pdstringvalue(t_pdstring *str);
+
+// create a STRING value that is a copy of a constant C-string
 extern t_pdvalue pdcstrvalue(t_pdmempool *alloc, const char *s);
 
 #define IS_ERR(v) ((v).pdtype == TPDERRVALUE)

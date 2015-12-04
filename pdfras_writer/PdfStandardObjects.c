@@ -113,8 +113,8 @@ t_pdvalue pd_generate_file_id(t_pdmempool *alloc, t_pdvalue info)
 	// make a 2-element array
 	t_pdarray *file_id = pd_array_new(alloc, 2);
 	// containing the hash as a binary string, twice
-	pd_array_add(file_id, pdstringvalue(pd_string_new(alloc, digest, sizeof digest, PD_TRUE)));
-	pd_array_add(file_id, pdstringvalue(pd_string_new(alloc, digest, sizeof digest, PD_TRUE)));
+	pd_array_add(file_id, pdstringvalue(pd_string_new_binary(alloc, sizeof digest, digest)));
+	pd_array_add(file_id, pdstringvalue(pd_string_new_binary(alloc, sizeof digest, digest)));
 	// TODO: don't encrypt the ID array!
 	//pd_dont_encrypt(file_id);
 	return pdarrayvalue(file_id);
@@ -162,9 +162,9 @@ void pd_catalog_add_page(t_pdvalue catalog, t_pdvalue page)
 	pd_dict_put(pagesdict, PDA_Count, pdintvalue(count.value.intvalue + 1));
 }
 
-t_pdvalue pd_contents_new(t_pdmempool *alloc, t_pdxref *xref, t_pdcontents_gen *gen)
+t_pdvalue pd_contents_new(t_pdmempool *pool, t_pdxref *xref, t_pdcontents_gen *gen)
 {
-	t_pdvalue contents = stream_new(alloc, xref, 0, pd_contents_generate, gen);
+	t_pdvalue contents = stream_new(pool, xref, 0, pd_contents_generate, gen);
 	pd_dict_put(contents, PDA_Length, pd_xref_create_forward_reference(xref));
 	return contents;
 }
