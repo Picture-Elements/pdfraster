@@ -6,13 +6,21 @@
 #include "PdfDatasink.h"
 
 typedef struct t_pdcontents_gen t_pdcontents_gen;
+
+// A content-generating function
 typedef void (*f_gen)(t_pdcontents_gen *gen, void *gencookie);
 
-extern t_pdcontents_gen *pd_contents_gen_new(t_pdmempool *alloc, f_gen gen, void *gencookie);
+// Create a new contents generator.
+// (which consists of a content-generating function and a cookie.)
+extern t_pdcontents_gen *pd_contents_gen_new(t_pdmempool *pool, f_gen gen, void *gencookie);
+
+// Free a contents generator
 extern void pd_contents_gen_free(t_pdcontents_gen *gen);
 
-extern void pd_contents_generate(t_datasink *sink, void *eventcookie);
+// Activate a contents-generator to output its contents to a datasink.
+extern void pd_contents_generate(t_datasink *sink, void *gen);
 
+// Helper functions for generating PDF content stream operators.
 extern void pd_gen_moveto(t_pdcontents_gen *gen, pddouble x, pddouble y);
 extern void pd_gen_lineto(t_pdcontents_gen *gen, pddouble x, pddouble y);
 extern void pd_gen_closepath(t_pdcontents_gen *gen);

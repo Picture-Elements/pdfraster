@@ -3,7 +3,6 @@
 #include "PdfStreaming.h"
 
 typedef struct t_pdcontents_gen {
-	t_pdmempool *alloc;
 	f_gen gen;
 	void *gencookie;
 	t_datasink *sink;
@@ -23,7 +22,6 @@ t_pdcontents_gen *pd_contents_gen_new(t_pdmempool *alloc, f_gen gen, void *genco
 	t_pdcontents_gen *generator = (t_pdcontents_gen *)pd_alloc(alloc, sizeof(t_pdcontents_gen));
 	if (!generator)
 		return 0;
-	generator->alloc = alloc;
 	generator->gen = gen;
 	generator->gencookie = gencookie;
 	opsys.writeout = gen_write_out;
@@ -39,10 +37,12 @@ void pd_contents_gen_free(t_pdcontents_gen *gen)
 	pd_free(gen);
 }
 
-void pd_contents_generate(t_datasink *sink, void *eventcookie)
+void pd_contents_generate(t_datasink *sink, void *gencookie)
 {
-	t_pdcontents_gen *gen = (t_pdcontents_gen *)eventcookie;
+	t_pdcontents_gen *gen = (t_pdcontents_gen *)gencookie;
+	// plug in the sink
 	gen->sink = sink;
+	// invoke the content-generating function
 	gen->gen(gen, gen->gencookie);
 }
 
