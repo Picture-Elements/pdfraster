@@ -693,6 +693,32 @@ static void test_time_fns()
 	pd_get_time_string(t, sztime);
 	validate_pdf_time_string(sztime);
 
+	struct tm local;
+	memset(&local, 0, sizeof local);
+	local.tm_hour = 1;
+	local.tm_min = 37;
+	local.tm_sec = 59;
+	local.tm_year = 115;
+	local.tm_mon = 2;
+	local.tm_mday = 14;
+	t = mktime(&local);
+	pd_get_time_string(t, sztime);
+	validate_pdf_time_string(sztime);
+	// date is December 31st 1969
+	assert(sztime[2] == '2');
+	assert(sztime[3] == '0');
+	assert(sztime[4] == '1');
+	assert(sztime[5] == '5');
+	assert(sztime[6] == '0');
+	assert(sztime[7] == '3');
+	assert(sztime[8] == '1');
+	assert(sztime[9] == '4');
+//
+	assert(sztime[12] == '3');
+	assert(sztime[13] == '7');
+	assert(sztime[14] == '5');
+	assert(sztime[15] == '9');
+
 	// check the higher-level functions that return string values
 	t_pdvalue then = pd_make_time_string(pool, t);
 	assert(IS_STRING(then));

@@ -29,16 +29,32 @@ char* pdatoulz(char* p, pduint32 n, int w)
 	return p;
 }
 
+// convert a time_t value to string in PDF time format
 void pd_get_time_string(time_t t, char szText[32])
 {
-	// Get broken-down local time
-	struct tm tmp = *localtime(&t);
+	// local time structure
+	struct tm tmp;
+	// The offset FROM UTC to local in minutes.
+	long UTCoff;
+	char chSign = '+';
+
+#if defined(WIN32) && _MSC_VER>=1900
+	// get local time
+	localtime_s(&tmp, &t);
+	// get the offset in seconds from local time to UTC:
+	_get_timezone(&UTCoff);
+	// We want the offset FROM UTC to local, in minutes:
+	UTCoff = -UTCoff / 60;
+#else
+	// get local time
+	tmp = *localtime(&t);
+	// localtime sets _timezone as a side-effect
 	// _timezone is offset from localtime to UTC in seconds.
 	// We want the offset FROM UTC to local, in minutes:
-	// "A PLUS SIGN as the value of the O field signifies that local time is now and later than UT,
-	// a HYPHEN - MINUS signifies that local time is earlier than UT, ..." [ISO PDF 2.0 DIS]
 	long UTCoff = -_timezone / 60;
-	char chSign = '+';
+#endif
+	// "A PLUS SIGN as the value of the O field signifies that local time is at or later than UT,
+	// a HYPHEN - MINUS signifies that local time is earlier than UT
 	if (UTCoff < 0) {
 		chSign = '-'; UTCoff = -UTCoff;
 	}
