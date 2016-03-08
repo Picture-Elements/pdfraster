@@ -96,24 +96,32 @@ void set_xmp_create_date(char* xmp, time_t t)
 	const char* MODIFYDATE = "<xap:ModifyDate>";
 	char* p = strstr(xmp, CREATEDATE);
 	if (p) {
-		p += strlen(CREATEDATE);
-		char* createDate = p;
+		char* createDate = (p += strlen(CREATEDATE));
 		// Format the time per XMP basic metadata
 		// YYYY-MM-DDThh:mm:ssTZD
-		struct tm *tmp = localtime(&t);
-		// As a side effect, localtime sets global 'timezone'
-		// to offset from localtime to UTC in seconds.
+		struct tm tmp = *localtime(&t);
+		// offset from UTC to local, in minutes:
+		long UTCoff;
+		char chSign = '+';
+#if defined(_MSC_VER) && _MSC_VER>=1900
+		// Visual Studio 2015 and later
+		_get_timezone(&UTCoff);
 		// We want the offset FROM UTC to local, and in minutes:
+		UTCoff = -UTCoff / 60;
+#else
+		// As a side effect, localtime sets global 'timezone'
+		// to the offset from localtime to UTC in seconds.
+		// We want the offset FROM UTC to local, and in minutes:
+		UTCoff = -timezone / 60;
+#endif
 		// "A PLUS SIGN as the value of the O field signifies that local time is at or later than UT,
 		// a HYPHEN - MINUS signifies that local time is earlier than UT
-		long UTCoff = -timezone / 60;
-		char chSign = '+';
 		if (UTCoff < 0) {
 			chSign = '-'; UTCoff = -UTCoff;
 		}
 		// Note - strftime is in theory affected by the current locale but
 		// the conversion specifiers we use here are locale-independent.
-		strftime(p, 20, "%Y-%m-%dT%H:%M:%S", tmp);
+		strftime(p, 20, "%Y-%m-%dT%H:%M:%S", &tmp);
 		// append offset to local time from UTC in the form <sign>hh:mm
 		p += pdstrlen(p);
 		sprintf(p, "%c%02d:%02d", chSign, UTCoff / 60, UTCoff % 60);
