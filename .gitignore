@@ -25,3 +25,4 @@ demo_raster_encoder/bw_ccitt_data.h
 demo_raster_encoder/color_page.h
 demo_raster_encoder/color_strip?.h
 demo_raster_encoder/gray8_page.h
+*.opendb
