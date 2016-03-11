@@ -23,10 +23,20 @@ extern void pd_page_add_image(t_pdvalue page, t_pdatom imageatom, t_pdvalue imag
 
 // date/time strings
 
-// convert a time_t value to string in PDF time format
-void pd_get_time_string(time_t t, char szText[32]);
+// format a time_t value as an (ASCII) string in PDF time format
+// and return the updated write pointer i.e. pointer to the trailing NUL.
+// Returns NULL if dstlen < 23
+char* pd_format_time(time_t t, char* dst, size_t dstlen);
 
+// format a time_t value as a string in XMP time format (max 25 chars)
+// and return the updated write pointer i.e. pointer to the trailing NUL.
+// Returns NULL if dstlen < 26
+char* pd_format_xmp_time(time_t t, char* dst, size_t dstlen);
+
+// construct a string object containing 'now' as a PDF time string
 t_pdvalue pd_make_now_string(t_pdmempool *alloc);
+
+// construct a string object containing a time_t as a PDF time string
 t_pdvalue pd_make_time_string(t_pdmempool *alloc, time_t t);
 
 // Create a new Metadata stream

@@ -29,51 +29,103 @@ char* pdatoulz(char* p, pduint32 n, int w)
 	return p;
 }
 
-// convert a time_t value to string in PDF time format
-void pd_get_time_string(time_t t, char szText[32])
+static long get_local_time_and_offset(time_t t, struct tm *ptm)
 {
-	// local time structure
-	struct tm tmp;
-	// The offset FROM UTC to local in minutes.
 	long UTCoff;
-	char chSign = '+';
-
 #if defined(WIN32) && _MSC_VER>=1900
 	// get local time
-	localtime_s(&tmp, &t);
+	localtime_s(ptm, &t);
 	// get the offset in seconds from local time to UTC:
 	_get_timezone(&UTCoff);
 	// We want the offset FROM UTC to local, in minutes:
 	UTCoff = -UTCoff / 60;
 #else
 	// get local time
-	tmp = *localtime(&t);
+	*ptm = *localtime(&t);
 	// localtime sets _timezone as a side-effect
 	// _timezone is offset from localtime to UTC in seconds.
 	// We want the offset FROM UTC to local, in minutes:
-	long UTCoff = -_timezone / 60;
+	UTCoff = -_timezone / 60;
 #endif
+	return UTCoff;
+}
+
+char* pd_format_time(time_t t, char* p, size_t dstlen)
+{
+	// local time structure
+	struct tm tmp;
+	// The offset FROM UTC to local in minutes.
+	long UTCoff = get_local_time_and_offset(t, &tmp);
+	char chSign = '+';
+	// if output doesn't have enough room for output
+	// including trailing NUL, fail.
+	if (dstlen < 23)
+	{
+		// fail
+		return NULL;
+	}
+
 	// "A PLUS SIGN as the value of the O field signifies that local time is at or later than UT,
 	// a HYPHEN - MINUS signifies that local time is earlier than UT
 	if (UTCoff < 0) {
 		chSign = '-'; UTCoff = -UTCoff;
 	}
 	//else if (UTCoff == 0) chSign = 'Z';		// is this necessary or right?
-	// Note - strftime is in theory affected by the current locale but
-	// the conversion specifiers we use here are locale-independent.
-	strftime(szText, 32, "D:%Y%m%d%H%M%S", &tmp);
-	// append offset to local time from UTC in the form <sign>HH'mm
-	char* p = szText + pdstrlen(szText);
+	*p++ = 'D'; *p++ = ':';
+	p = pdatoulz(p, tmp.tm_year + 1900, 4);
+	p = pdatoulz(p, tmp.tm_mon + 1, 2);
+	p = pdatoulz(p, tmp.tm_mday, 2);
+	p = pdatoulz(p, tmp.tm_hour, 2);
+	p = pdatoulz(p, tmp.tm_min, 2);
+	p = pdatoulz(p, tmp.tm_sec, 2);
+	// append offset FROM UTC TO local time in the form <sign>HH'mm
 	*p++ = chSign;
 	p = pdatoulz(p, UTCoff / 60, 2);
 	*p++ = '\'';
-	p = pdatoulz(p, UTCoff % 60, 2);
+	return pdatoulz(p, UTCoff % 60, 2);
+}
+
+char* pd_format_xmp_time(time_t t, char* p, size_t dstlen)
+{
+	struct tm tmp;
+	// offset from UTC to local, in minutes:
+	long UTCoff = get_local_time_and_offset(t, &tmp);
+	char chSign = '+';
+
+	// IF not enough output room, fail immediately
+	if (dstlen < 26) {
+		return NULL;
+	}
+
+	// Format the time per XMP basic metadata
+	// YYYY-MM-DDThh:mm:ssOZZ:ZZ
+	p = pdatoulz(p, tmp.tm_year + 1900, 4);
+	*p++ = '-';
+	p = pdatoulz(p, tmp.tm_mon + 1, 2);
+	*p++ = '-';
+	p = pdatoulz(p, tmp.tm_mday, 2);
+	*p++ = 'T';
+	p = pdatoulz(p, tmp.tm_hour, 2);
+	*p++ = ':';
+	p = pdatoulz(p, tmp.tm_min, 2);
+	*p++ = ':';
+	p = pdatoulz(p, tmp.tm_sec, 2);
+	// append offset to local time from UTC, in the form <sign>hh:mm
+	// "A PLUS SIGN as the value of the O field signifies that local time is at or later than UT,
+	// a HYPHEN - MINUS signifies that local time is earlier than UT
+	if (UTCoff < 0) {
+		chSign = '-'; UTCoff = -UTCoff;
+	}
+	*p++ = chSign;
+	p = pdatoulz(p, UTCoff / 60, 2);
+	*p++ = ':';
+	return pdatoulz(p, UTCoff % 60, 2);
 }
 
 t_pdvalue pd_make_time_string(t_pdmempool *alloc, time_t t)
 {
 	char szText[32];
-	pd_get_time_string(t, szText);
+	pd_format_time(t, szText, ELEMENTS(szText));
 	return pdcstrvalue(alloc, szText);
 }
 

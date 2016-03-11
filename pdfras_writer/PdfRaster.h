@@ -12,7 +12,8 @@ extern "C" {
 
 #define PDFRAS_API_LEVEL	1
 
-#define PDFRAS_LIBRARY_VERSION "0.9"
+#define PDFRAS_LIBRARY_VERSION "0.10"
+// 0.10	spike	2016.03.11	new: pd_format_xmp_time, renamed pd_get_time_string => pd_format_time
 // 0.9	spike	2015.12.01	multi-strip working
 // 0.8	spike	2015.09.25	added file ID in trailer dict
 // 0.7	spike	2015.09.17	introducing calibrated vs device colorspaces
