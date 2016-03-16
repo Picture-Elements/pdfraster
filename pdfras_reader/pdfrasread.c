@@ -16,8 +16,7 @@ typedef struct t_xref_entry {
 	char		gen[6];						// space + 5-digit generation number
 	char		status[2];					// " n" (in use) or " f" (free)
 	char		eol[2];
-};
-typedef struct t_xref_entry t_xref_entry;
+} t_xref_entry;
 
 // Structure that represents a PDF/raster byte-stream that is open for reading
 typedef struct t_pdfrasreader {

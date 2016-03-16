@@ -680,18 +680,104 @@ static void validate_pdf_time_string(const char* sztime)
 	assert(offset <= 14 * 60);
 }
 
+static void validate_xmp_time_string(const char* xmp)
+{
+	// YYYY-MM-DDTHH:MM:SSshh:mm
+	// Always the same length.
+	assert(strlen(xmp) == 25);
+	// starts with "D:"
+	assert(xmp[0] == '2');	// valid for quite a while
+	assert(xmp[1] == '0');
+	assert(isdigit(xmp[2]));	// decade
+	assert(isdigit(xmp[3]));	// year in decade
+	assert(xmp[4] == '-');
+	assert(xmp[5] == '0' || xmp[6] == '1');	// 1st digit of month
+	assert(isdigit(xmp[6]));	// 2nd digit of month
+	int month = (xmp[5] - '0') * 10 + xmp[6] - '0';
+	assert(month >= 1 && month <= 12);
+	assert(xmp[7] == '-');
+	assert(isdigit(xmp[8]));	// 1st digit of day
+	assert(isdigit(xmp[9]));	// 2nd digit of day
+	int day = (xmp[8] - '0') * 10 + xmp[9] - '0';
+	assert(day >= 1 && day <= 31);
+	assert(xmp[10] == 'T');
+	// HH:MM:SS
+	assert(isdigit(xmp[11]));
+	assert(isdigit(xmp[12]));
+	assert(xmp[13] == ':');
+	assert(isdigit(xmp[14]));
+	assert(isdigit(xmp[15]));
+	assert(xmp[16] == ':');
+	assert(isdigit(xmp[17]));
+	assert(isdigit(xmp[18]));
+	int HH = (xmp[11] - '0') * 10 + xmp[12] - '0';
+	int MM = (xmp[14] - '0') * 10 + xmp[15] - '0';
+	int SS = (xmp[17] - '0') * 10 + xmp[18] - '0';
+	assert(HH >= 0 && HH < 24);
+	assert(MM >= 0 && MM < 60);
+	assert(SS >= 0 && SS < 60);
+	assert(xmp[19] == '+' || xmp[19] == '-');
+	assert(isdigit(xmp[20]));
+	assert(isdigit(xmp[21]));
+	int offh = atoi(xmp + 19);	// timezone offset in hours (Z to local)
+	assert(offh >= -12 && offh <= 14);
+	// yes, 13 and 14 are apparently technically possible.
+	// Do you want to take that call? I don't.
+	assert(xmp[22] == ':');
+	assert(isdigit(xmp[23]));
+	assert(isdigit(xmp[24]));
+	int offm = atoi(xmp + 23);	// timezone offset minutes
+	assert(offm == 0 || offm == 15 || offm == 30 || offm == 45);
+	// compute total minutes of offset
+	int offset = offh * 60;
+	offset += (offh >= 0) ? offm : -offm;
+	assert(offset >= -12 * 60);
+	assert(offset <= 14 * 60);
+}
+
 static void test_time_fns()
 {
 	printf("time functions\n");
-	char sztime[200];
+	char sztime[32], xmptime[32];
 	time_t t;
 	t_pdmempool* pool = os.allocsys;
 	assert(pd_get_block_count(pool) == 0);
 	assert(pd_get_bytes_in_use(pool) == 0);
 
 	time(&t);
-	pd_get_time_string(t, sztime);
+	// check the low-level functions that format time strings
+	// PDF format
+	pd_format_time(t, sztime, ELEMENTS(sztime));
 	validate_pdf_time_string(sztime);
+
+	pd_format_xmp_time(t, xmptime, ELEMENTS(xmptime));
+	validate_xmp_time_string(xmptime);
+
+	struct tm local;
+	memset(&local, 0, sizeof local);
+	local.tm_hour = 1;
+	local.tm_min = 37;
+	local.tm_sec = 59;
+	local.tm_year = 115;
+	local.tm_mon = 2;
+	local.tm_mday = 14;
+	t = mktime(&local);
+	pd_format_time(t, sztime, ELEMENTS(sztime));
+	validate_pdf_time_string(sztime);
+	// date is December 31st 1969
+	assert(sztime[2] == '2');
+	assert(sztime[3] == '0');
+	assert(sztime[4] == '1');
+	assert(sztime[5] == '5');
+	assert(sztime[6] == '0');
+	assert(sztime[7] == '3');
+	assert(sztime[8] == '1');
+	assert(sztime[9] == '4');
+//
+	assert(sztime[12] == '3');
+	assert(sztime[13] == '7');
+	assert(sztime[14] == '5');
+	assert(sztime[15] == '9');
 
 	// check the higher-level functions that return string values
 	t_pdvalue then = pd_make_time_string(pool, t);
@@ -717,7 +803,7 @@ static void test_time_fns()
 #endif
 	_tzset();
 	assert(_timezone == 0);
-	pd_get_time_string(t, sztime);
+	pd_format_time(t, sztime, ELEMENTS(sztime));
 	validate_pdf_time_string(sztime);
 	// timezone offset must be +00'00
 	assert(sztime[16] == '+');			// should not be negative ;-)

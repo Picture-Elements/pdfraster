@@ -6,6 +6,7 @@
 #include <string.h>
 
 #include "PdfRaster.h"
+#include "PdfStandardObjects.h"
 
 #include "bw_ccitt_data.h"
 #include "color_page.h"
@@ -96,37 +97,17 @@ void set_xmp_create_date(char* xmp, time_t t)
 	const char* MODIFYDATE = "<xap:ModifyDate>";
 	char* p = strstr(xmp, CREATEDATE);
 	if (p) {
-		p += strlen(CREATEDATE);
-		char* createDate = p;
-		// Format the time per XMP basic metadata
-		// YYYY-MM-DDThh:mm:ssTZD
-		struct tm *tmp = localtime(&t);
-		// As a side effect, localtime sets global 'timezone'
-		// to offset from localtime to UTC in seconds.
-		// We want the offset FROM UTC to local, and in minutes:
-		// "A PLUS SIGN as the value of the O field signifies that local time is at or later than UT,
-		// a HYPHEN - MINUS signifies that local time is earlier than UT
-		long UTCoff = -timezone / 60;
-		char chSign = '+';
-		if (UTCoff < 0) {
-			chSign = '-'; UTCoff = -UTCoff;
-		}
-		// Note - strftime is in theory affected by the current locale but
-		// the conversion specifiers we use here are locale-independent.
-		strftime(p, 20, "%Y-%m-%dT%H:%M:%S", tmp);
-		// append offset to local time from UTC in the form <sign>hh:mm
-		p += pdstrlen(p);
-		sprintf(p, "%c%02d:%02d", chSign, UTCoff / 60, UTCoff % 60);
-		p += pdstrlen(p);
-		// hack alert...  put back the following '<' that
-		// was clobbered by the trailing NUL of the sprintf:
-		*p = '<';
-		size_t datelen = p - createDate;
-
+		p += pdstrlen(CREATEDATE);
+		// format the time t into XMP timestamp format:
+		char xmpDate[32];
+		pd_format_xmp_time(t, xmpDate, ELEMENTS(xmpDate));
+		// plug it into the XML template
+		memcpy(p, xmpDate, pdstrlen(xmpDate));
+		// likewise for the modify date
 		p = strstr(xmp, MODIFYDATE);
 		if (p) {
 			p += pdstrlen(MODIFYDATE);
-			memmove(p, createDate, datelen);
+			memcpy(p, xmpDate, pdstrlen(xmpDate));
 		}
 	}
 }
