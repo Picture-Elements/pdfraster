@@ -6,6 +6,9 @@
 #include "PdfDict.h"
 #include "PdfArray.h"
 #include "PdfContentsGenerator.h"
+// creates a static byte array named srgb_icc_profile:
+#include "../icc_profile/srgb_icc_profile.h"
+
 
 static t_pdatom ToCompressionAtom(e_ImageCompression comp)
 {
@@ -105,9 +108,6 @@ t_pdvalue pd_make_calgray_colorspace(t_pdmempool *alloc, double black[3], double
 	// all done.
 	return pdarrayvalue(cs);
 }
-
-// creates a static byte array named srgb_icc_profile:
-#include "..\icc_profile\srgb_icc_profile.h"
 
 typedef struct {
 	const pduint8*	pointer;
