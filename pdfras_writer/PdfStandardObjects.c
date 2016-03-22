@@ -39,6 +39,12 @@ static long get_local_time_and_offset(time_t t, struct tm *ptm)
 	_get_timezone(&UTCoff);
 	// We want the offset FROM UTC to local, in minutes:
 	UTCoff = -UTCoff / 60;
+#elif defined(__GNUC__)
+    if (localtime_r(&t, ptm)) {
+        // get offset from UTC to local time, including daylight saving
+        // in minutes:
+        UTCoff = ptm->tm_gmtoff / 60;
+    }
 #else
 	// get local time
 	*ptm = *localtime(&t);
