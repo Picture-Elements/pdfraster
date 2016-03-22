@@ -5,6 +5,7 @@
 #include <string.h>
 #include <time.h>
 #include <ctype.h>
+#include <assert.h>
 
 #include "PdfStreaming.h"
 #include "PdfStrings.h"
@@ -24,9 +25,27 @@
 ///////////////////////////////////////////////////////////////////////
 // Macros
 
+#ifdef WIN32
 _CRTIMP void __cdecl _wassert(_In_z_ const wchar_t * _Message, _In_z_ const wchar_t *_File, _In_ unsigned _Line);
 
 #define assert(_Expression) (void)( (!!(_Expression)) || (_wassert(_CRT_WIDE(#_Expression), _CRT_WIDE(__FILE__), __LINE__), 0) )
+#endif
+
+#ifdef _MSC_VER
+// Microsoft C/C++
+// has sprintf_s
+
+#define TIMEZONE _timezone
+#define TZSET _tzset
+#define SETENV(var,val) _putenv_s(var, val)
+#else
+// sprintf_s is not standard, snprintf seems to be?
+#define sprintf_s(buffer, buffer_size, stringbuffer, ...) (sprintf(buffer, stringbuffer, __VA_ARGS__))
+
+#define TIMEZONE timezone
+#define TZSET tzset
+#define SETENV(var,val) setenv(var, val, 1)
+#endif
 
 ///////////////////////////////////////////////////////////////////////
 // Types
@@ -796,13 +815,9 @@ static void test_time_fns()
 
 	// OK, try futzing with the timezone
 	// switch to UTC
-#ifdef _WIN32
-	_putenv_s("TZ", "UTC");
-#else
-	setenv("TZ", "UTC", 1);
-#endif
-	_tzset();
-	assert(_timezone == 0);
+    SETENV("TZ", "UTC");
+	TZSET();
+	assert(TIMEZONE == 0);
 	pd_format_time(t, sztime, ELEMENTS(sztime));
 	validate_pdf_time_string(sztime);
 	// timezone offset must be +00'00
@@ -837,7 +852,7 @@ static pdbool iterStopAfter3(t_pdatom atom, t_pdvalue value, void *cookie)
 	return callbacks != 3;
 }
 
-static callback_mask;
+static unsigned callback_mask;
 
 static pdbool iterCheck5(t_pdatom atom, t_pdvalue value, void *cookie)
 {
@@ -1715,7 +1730,7 @@ void test_file_structure()
 
 	// Test the function: pd_write_pdf_header
 	pd_write_pdf_header(out, "1.4", NULL);
-	assert(0 == strcmp(output, "%PDF-1.4\n%‚„œ”\n"));
+	assert(0 == strcmp(output, "%PDF-1.4\n%\xE2\xE3\xCF\xD3\n"));
 
 	buffer.pos = 0;
 	pd_write_pdf_header(out, "2.0", "xyzzy");
@@ -1741,12 +1756,12 @@ void test_file_structure()
 	// refresh the output stream
 	buffer.pos = 0; pd_outstream_free(out); out = pd_outstream_new(pool, &os);
 	// write out a 'classic' PDF header
-	pd_write_pdf_header(out, "1.6", "%‚„œ”");
+	pd_write_pdf_header(out, "1.6", "%\xE2\xE3\xCF\xD3");
 	// then write out all the ending stuff.
 	pd_write_endofdocument(out, xref, catalog, DID);
 	assert(0 == pd_strcmp(output,
 "%PDF-1.6\n"
-"%‚„œ”\n"
+"%\xE2\xE3\xCF\xD3\n"
 "xref\n"
 "0 1\n"
 "0000000000 65535 f\r\n"
