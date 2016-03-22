@@ -5,7 +5,6 @@
 #include <string.h>
 #include <time.h>
 #include <ctype.h>
-#include <assert.h>
 
 #include "PdfStreaming.h"
 #include "PdfStrings.h"
@@ -25,12 +24,6 @@
 ///////////////////////////////////////////////////////////////////////
 // Macros
 
-#ifdef WIN32
-_CRTIMP void __cdecl _wassert(_In_z_ const wchar_t * _Message, _In_z_ const wchar_t *_File, _In_ unsigned _Line);
-
-#define assert(_Expression) (void)( (!!(_Expression)) || (_wassert(_CRT_WIDE(#_Expression), _CRT_WIDE(__FILE__), __LINE__), 0) )
-#endif
-
 #ifdef _MSC_VER
 // Microsoft C/C++
 // has sprintf_s
@@ -47,6 +40,8 @@ _CRTIMP void __cdecl _wassert(_In_z_ const wchar_t * _Message, _In_z_ const wcha
 #define SETENV(var,val) setenv(var, val, 1)
 #endif
 
+#define assert(T) { if (!(T)) assert_fail(#T, __LINE__); }
+
 ///////////////////////////////////////////////////////////////////////
 // Types
 
@@ -58,6 +53,8 @@ typedef struct {
 
 ///////////////////////////////////////////////////////////////////////
 // Globals
+
+unsigned fails = 0;
 
 // platform functions
 t_OS os;
@@ -71,6 +68,12 @@ membuf buffer = {
 
 ///////////////////////////////////////////////////////////////////////
 // Helpers and handlers
+
+void assert_fail(const char* cond, unsigned line)
+{
+	fails++;
+	printf("** Assert(%s) failed at line %u\n", cond, line);
+}
 
 static void myMemSet(void *ptr, pduint8 value, size_t count)
 {
@@ -1821,8 +1824,9 @@ int main(int argc, char** argv)
 
 	test_file_structure();
 
-	printf("Hit enter to exit:\n");
+	printf("------------------------------\n");
+	printf("%u fails.  Hit [enter] to exit:\n", fails);
 	getchar();
-	return 0;
+	return fails;
 }
 
