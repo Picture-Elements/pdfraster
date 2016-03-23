@@ -4,46 +4,47 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include "..\pdfras_reader\pdfrasread_files.h"
-#include <assert.h>
 #include <direct.h>
+
+#include "test_support.h"
 
 void signature_tests()
 {
 	printf("--signature recognition\n");
-	assert(0 == pdfras_recognize_signature(0));
-	assert(0 == pdfras_recognize_signature(""));
-	assert(0 == pdfras_recognize_signature("PDF-1.4\n%®âš†er-1.0\n"));
-	assert(1 == pdfras_recognize_signature("%PDF-1.4\r\n%®âš†er-1.0\r\n"));
-	assert(1 == pdfras_recognize_signature("%PDF-1.4\r%®âš†er-1.0\r"));
-	assert(1 == pdfras_recognize_signature("%PDF-1.4\n%®âš†er-1.0\n"));
-	assert(1 == pdfras_recognize_signature("%PDF-1.4\n%®âš†er-1.1\n"));
-	assert(1 == pdfras_recognize_signature("%PDF-1.5\n%®âš†er-1.2\n"));
-	assert(1 == pdfras_recognize_signature("%PDF-1.6\n%®âš†er-1.3\n"));
-	assert(1 == pdfras_recognize_signature("%PDF-1.7\n%®âš†er-10.27\n"));
-	assert(0 == pdfras_recognize_signature("%PDF-1.4\n\n%®âš†er-1.0\r\n"));
-	assert(0 == pdfras_recognize_signature("%PDF"));
-	assert(0 == pdfras_recognize_signature("%PDF-1.\n"));
-	assert(0 == pdfras_recognize_signature("%PDF-1.4\n"));
-	assert(0 == pdfras_recognize_signature("%PDF-1.4\n%"));
-	assert(0 == pdfras_recognize_signature("%PDF-1.4\n%®âš†er"));
-	assert(0 == pdfras_recognize_signature("%PDF-1.4\r\n%®âš†er\r\n"));
-	assert(0 == pdfras_recognize_signature("%PDF-1.4\r\n%®âš†er-\r\n"));
-	assert(0 == pdfras_recognize_signature("%PDF-1.4\r\n%®âš†er-1\r\n"));
-	assert(0 == pdfras_recognize_signature("%PDF-1.4\r\n%®âš†er-1.\r\n"));
-	assert(0 == pdfras_recognize_signature("%PDF-1.4\r\n%®âš†e-1.0\r\n"));
+	ASSERT(0 == pdfras_recognize_signature(0));
+	ASSERT(0 == pdfras_recognize_signature(""));
+	ASSERT(0 == pdfras_recognize_signature("PDF-1.4\n%®âš†er-1.0\n"));
+	ASSERT(1 == pdfras_recognize_signature("%PDF-1.4\r\n%®âš†er-1.0\r\n"));
+	ASSERT(1 == pdfras_recognize_signature("%PDF-1.4\r%®âš†er-1.0\r"));
+	ASSERT(1 == pdfras_recognize_signature("%PDF-1.4\n%®âš†er-1.0\n"));
+	ASSERT(1 == pdfras_recognize_signature("%PDF-1.4\n%®âš†er-1.1\n"));
+	ASSERT(1 == pdfras_recognize_signature("%PDF-1.5\n%®âš†er-1.2\n"));
+	ASSERT(1 == pdfras_recognize_signature("%PDF-1.6\n%®âš†er-1.3\n"));
+	ASSERT(1 == pdfras_recognize_signature("%PDF-1.7\n%®âš†er-10.27\n"));
+	ASSERT(0 == pdfras_recognize_signature("%PDF-1.4\n\n%®âš†er-1.0\r\n"));
+	ASSERT(0 == pdfras_recognize_signature("%PDF"));
+	ASSERT(0 == pdfras_recognize_signature("%PDF-1.\n"));
+	ASSERT(0 == pdfras_recognize_signature("%PDF-1.4\n"));
+	ASSERT(0 == pdfras_recognize_signature("%PDF-1.4\n%"));
+	ASSERT(0 == pdfras_recognize_signature("%PDF-1.4\n%®âš†er"));
+	ASSERT(0 == pdfras_recognize_signature("%PDF-1.4\r\n%®âš†er\r\n"));
+	ASSERT(0 == pdfras_recognize_signature("%PDF-1.4\r\n%®âš†er-\r\n"));
+	ASSERT(0 == pdfras_recognize_signature("%PDF-1.4\r\n%®âš†er-1\r\n"));
+	ASSERT(0 == pdfras_recognize_signature("%PDF-1.4\r\n%®âš†er-1.\r\n"));
+	ASSERT(0 == pdfras_recognize_signature("%PDF-1.4\r\n%®âš†e-1.0\r\n"));
 	// check for missing dots and dashes
-	assert(0 == pdfras_recognize_signature("%PDF-14\r\n%®âš†er-1.0\r\n"));
-	assert(0 == pdfras_recognize_signature("%PDF-1.4\r\n%®âš†er-10\r\n"));
-	assert(0 == pdfras_recognize_signature("%PDF1.4\r\n%®âš†er-1.0\r\n"));
-	assert(0 == pdfras_recognize_signature("%PDF-1.4\r\n%®âš†er1.0\r\n"));
+	ASSERT(0 == pdfras_recognize_signature("%PDF-14\r\n%®âš†er-1.0\r\n"));
+	ASSERT(0 == pdfras_recognize_signature("%PDF-1.4\r\n%®âš†er-10\r\n"));
+	ASSERT(0 == pdfras_recognize_signature("%PDF1.4\r\n%®âš†er-1.0\r\n"));
+	ASSERT(0 == pdfras_recognize_signature("%PDF-1.4\r\n%®âš†er1.0\r\n"));
 	// check that it works with files
-	assert(0 == pdfrasread_recognize_file(NULL));
-	assert(0 == pdfrasread_recognize_filename("exists.not"));
-	assert(0 == pdfrasread_recognize_filename("badsig1.pdf"));
-	assert(0 == pdfrasread_recognize_filename("badsig2.pdf"));
-	assert(1 == pdfrasread_recognize_filename("valid1.pdf"));
+	ASSERT(0 == pdfrasread_recognize_file(NULL));
+	ASSERT(0 == pdfrasread_recognize_filename("exists.not"));
+	ASSERT(0 == pdfrasread_recognize_filename("badsig1.pdf"));
+	ASSERT(0 == pdfrasread_recognize_filename("badsig2.pdf"));
+	ASSERT(1 == pdfrasread_recognize_filename("valid1.pdf"));
 	// bad PDF, but has PDF/raster signature:
-	assert(1 == pdfrasread_recognize_filename("bad_trailer1.pdf"));
+	ASSERT(1 == pdfrasread_recognize_filename("bad_trailer1.pdf"));
 	printf("passed\n");
 }
 
@@ -69,13 +70,13 @@ void create_destroy_tests()
 {
 	printf("-- reader create/destroy tests --\n");
 	t_pdfrasreader* reader = pdfrasread_create(PDFRAS_API_LEVEL, &freader, &fcloser);
-	assert(reader != NULL);
+	ASSERT(reader != NULL);
 	// a freshly created reader is not open:
-	assert(!pdfrasread_is_open(reader));
+	ASSERT(!pdfrasread_is_open(reader));
 	// closing a reader that is not open does nothing and returns FALSE:
-	assert(pdfrasread_close(reader) == FALSE);
+	ASSERT(pdfrasread_close(reader) == FALSE);
 	// the source of a newly created reader is 0 (NULL)
-	assert(pdfrasread_source(reader) == NULL);
+	ASSERT(pdfrasread_source(reader) == NULL);
 
 	pdfrasread_destroy(reader);
 	printf("passed\n");
@@ -86,11 +87,11 @@ void page_count_tests()
 {
 	printf("--page counting --\n");
 	// some random PDF with 3 pages, old-style xref table:
-	assert(3 == pdfrasread_page_count_filename("3pages.pdf"));
+	ASSERT(3 == pdfrasread_page_count_filename("3pages.pdf"));
 	// generated by pdfras_writer:
-	assert(6 == pdfrasread_page_count_filename("valid1.pdf"));
-	assert(-1 == pdfrasread_page_count_filename("bad_trailer1.pdf"));
-	assert(-1 == pdfrasread_page_count_filename("badxref1.pdf"));
+	ASSERT(6 == pdfrasread_page_count_filename("valid1.pdf"));
+	ASSERT(-1 == pdfrasread_page_count_filename("bad_trailer1.pdf"));
+	ASSERT(-1 == pdfrasread_page_count_filename("badxref1.pdf"));
 	printf("passed\n");
 }
 
@@ -99,56 +100,56 @@ void page_info_tests()
 	printf("--page info--\n");
 	t_pdfrasreader* reader = pdfrasread_open_filename(PDFRAS_API_LEVEL, "valid1.pdf");
 	// that should be successful:
-	assert(reader != NULL);
+	ASSERT(reader != NULL);
 	// After successful open, this must be TRUE:
-	assert(pdfrasread_is_open(reader)==TRUE);
+	ASSERT(pdfrasread_is_open(reader)==TRUE);
 	// don't know what source is exactly, but assuming it's a FILE*
 	// it shouldn't be NULL:
-	assert(pdfrasread_source(reader) != NULL);
+	ASSERT(pdfrasread_source(reader) != NULL);
 	// that file has 6 pages:
-	assert(6 == pdfrasread_page_count(reader));
+	ASSERT(6 == pdfrasread_page_count(reader));
 
-	assert(PDFRAS_GRAY8 == pdfrasread_page_format(reader, 0));
-	assert(8 == pdfrasread_page_width(reader, 0));
-	assert(11 == pdfrasread_page_height(reader, 0));
-	assert(0 == pdfrasread_page_rotation(reader, 0));
-	assert(2.0 == pdfrasread_page_horizontal_dpi(reader, 0));
-	assert(2.0 == pdfrasread_page_vertical_dpi(reader, 0));
+	ASSERT(PDFRAS_GRAY8 == pdfrasread_page_format(reader, 0));
+	ASSERT(8 == pdfrasread_page_width(reader, 0));
+	ASSERT(11 == pdfrasread_page_height(reader, 0));
+	ASSERT(0 == pdfrasread_page_rotation(reader, 0));
+	ASSERT(2.0 == pdfrasread_page_horizontal_dpi(reader, 0));
+	ASSERT(2.0 == pdfrasread_page_vertical_dpi(reader, 0));
 
-	assert(PDFRAS_GRAY16 == pdfrasread_page_format(reader, 1));
-	assert(64 == pdfrasread_page_width(reader, 1));
-	assert(512 == pdfrasread_page_height(reader, 1));
-	assert(0 == pdfrasread_page_rotation(reader, 1));
-	assert(16.0 == pdfrasread_page_horizontal_dpi(reader, 1));
-	assert(128.0 == pdfrasread_page_vertical_dpi(reader, 1));
+	ASSERT(PDFRAS_GRAY16 == pdfrasread_page_format(reader, 1));
+	ASSERT(64 == pdfrasread_page_width(reader, 1));
+	ASSERT(512 == pdfrasread_page_height(reader, 1));
+	ASSERT(0 == pdfrasread_page_rotation(reader, 1));
+	ASSERT(16.0 == pdfrasread_page_horizontal_dpi(reader, 1));
+	ASSERT(128.0 == pdfrasread_page_vertical_dpi(reader, 1));
 
-	assert(PDFRAS_BITONAL == pdfrasread_page_format(reader, 2));
-	assert(850 == pdfrasread_page_width(reader, 2));
-	assert(1100 == pdfrasread_page_height(reader, 2));
-	assert(0 == pdfrasread_page_rotation(reader, 2));
-	assert(100.0 == pdfrasread_page_horizontal_dpi(reader, 2));
-	assert(100.0 == pdfrasread_page_vertical_dpi(reader, 2));
+	ASSERT(PDFRAS_BITONAL == pdfrasread_page_format(reader, 2));
+	ASSERT(850 == pdfrasread_page_width(reader, 2));
+	ASSERT(1100 == pdfrasread_page_height(reader, 2));
+	ASSERT(0 == pdfrasread_page_rotation(reader, 2));
+	ASSERT(100.0 == pdfrasread_page_horizontal_dpi(reader, 2));
+	ASSERT(100.0 == pdfrasread_page_vertical_dpi(reader, 2));
 
-	assert(PDFRAS_BITONAL == pdfrasread_page_format(reader, 3));
-	assert(2521 == pdfrasread_page_width(reader, 3));
-	assert(3279 == pdfrasread_page_height(reader, 3));
-	assert(0 == pdfrasread_page_rotation(reader, 3));
-	assert(300.0 == pdfrasread_page_horizontal_dpi(reader, 3));
-	assert(300.0 == pdfrasread_page_vertical_dpi(reader, 3));
+	ASSERT(PDFRAS_BITONAL == pdfrasread_page_format(reader, 3));
+	ASSERT(2521 == pdfrasread_page_width(reader, 3));
+	ASSERT(3279 == pdfrasread_page_height(reader, 3));
+	ASSERT(0 == pdfrasread_page_rotation(reader, 3));
+	ASSERT(300.0 == pdfrasread_page_horizontal_dpi(reader, 3));
+	ASSERT(300.0 == pdfrasread_page_vertical_dpi(reader, 3));
 
-	assert(PDFRAS_RGB24 == pdfrasread_page_format(reader, 4));
-	assert(175 == pdfrasread_page_width(reader, 4));
-	assert(100 == pdfrasread_page_height(reader, 4));
-	assert(90 == pdfrasread_page_rotation(reader, 4));
-	assert(50.0 == pdfrasread_page_horizontal_dpi(reader, 4));
-	assert(50.0 == pdfrasread_page_vertical_dpi(reader, 4));
+	ASSERT(PDFRAS_RGB24 == pdfrasread_page_format(reader, 4));
+	ASSERT(175 == pdfrasread_page_width(reader, 4));
+	ASSERT(100 == pdfrasread_page_height(reader, 4));
+	ASSERT(90 == pdfrasread_page_rotation(reader, 4));
+	ASSERT(50.0 == pdfrasread_page_horizontal_dpi(reader, 4));
+	ASSERT(50.0 == pdfrasread_page_vertical_dpi(reader, 4));
 
-	assert(PDFRAS_RGB24 == pdfrasread_page_format(reader, 5));
-	assert(850 == pdfrasread_page_width(reader, 5));
-	assert(1100 == pdfrasread_page_height(reader, 5));
-	assert(180 == pdfrasread_page_rotation(reader, 5));
-	assert(100.0 == pdfrasread_page_horizontal_dpi(reader, 5));
-	assert(100.0 == pdfrasread_page_vertical_dpi(reader, 5));
+	ASSERT(PDFRAS_RGB24 == pdfrasread_page_format(reader, 5));
+	ASSERT(850 == pdfrasread_page_width(reader, 5));
+	ASSERT(1100 == pdfrasread_page_height(reader, 5));
+	ASSERT(180 == pdfrasread_page_rotation(reader, 5));
+	ASSERT(100.0 == pdfrasread_page_horizontal_dpi(reader, 5));
+	ASSERT(100.0 == pdfrasread_page_vertical_dpi(reader, 5));
 
 	pdfrasread_destroy(reader);
 	printf("passed\n");
@@ -159,8 +160,8 @@ void strip_data_tests()
 	printf("-- strip data tests --\n");
 	// open our standard test file
 	t_pdfrasreader* reader = pdfrasread_open_filename(PDFRAS_API_LEVEL, "valid1.pdf");
-	assert(reader != NULL);
-	assert(pdfrasread_is_open(reader) == TRUE);
+	ASSERT(reader != NULL);
+	ASSERT(pdfrasread_is_open(reader) == TRUE);
 	int pages = pdfrasread_page_count(reader);
 	// check out page 0
 	int p = 0;
@@ -171,16 +172,16 @@ void strip_data_tests()
 	// get the maximum buffer size needed for any strip on this page
 	size_t max_size = pdfrasread_max_strip_size(reader, p);
 	pduint8* rawstrip = (pduint8*)malloc(max_size);
-	assert(rawstrip != NULL);
+	ASSERT(rawstrip != NULL);
 	for (int s = 0; s < strips; s++) {
 		//int h = pdfrasread_strip_height(reader, p, s);
-		//assert(h > 0);
+		//ASSERT(h > 0);
 		//total_height += h;
-		assert(total_height <= page_height);
+		ASSERT(total_height <= page_height);
 		size_t rcvd = pdfrasread_read_raw_strip(reader, p, s, rawstrip, max_size);
-		assert(rcvd <= max_size);
+		ASSERT(rcvd <= max_size);
 	}
-	//assert(total_height == page_height);
+	//ASSERT(total_height == page_height);
 	free(rawstrip);
 	printf("passed\n");
 } // strip_data_tests
@@ -197,8 +198,12 @@ int main(int argc, char* argv[])
 	page_count_tests();
 	page_info_tests();
 	strip_data_tests();
-	printf("Hit enter to exit:\n");
+
+	unsigned fails = get_number_of_failures();
+
+	printf("\n------------------------------\n");
+	printf("%u fails.  Hit [enter] to exit:\n", fails);
 	getchar();
-	return 0;
+	return fails;
 }
 
