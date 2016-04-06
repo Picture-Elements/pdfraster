@@ -4,8 +4,14 @@
 H =	../pdfras_writer/PdfRaster.h
 A = ../pdfras_writer/libpdfras_writer.a
 
-CFLAGS = -O -g -I../pdfras_writer -I../common
+CFLAGS = -O -g -I"../common" -I"../pdfras_writer" -lpdfras_writer
 
-pdfras_writer_tests: pdfras_writer_tests.c ../common/test_support.c $(A)
+LDFLAGS = -L../pdfras_writer
 
-pdfras_writer_tests.o: pdfras_writer_tests.c $(H)
+LIBS = -lpdfras_writer
+
+pdfras_writer_tests: pdfras_writer_tests.c ../common/test_support.c
+
+clean:
+	rm -rf *.dSYM
+	rm -f *. *.o

@@ -1,7 +1,7 @@
 
 # This is a makefile for building on non-Windows platforms.
 
-O =	md5.c \
+O =	md5.o \
 	PdfAlloc.o \
 	PdfArray.o \
 	PdfAtoms.o \
@@ -22,10 +22,12 @@ O =	md5.c \
 
 CFLAGS = -O -g
 
+# create a static library for pdfras_writer
 libpdfras_writer.a: $O
 	@rm -f $@
-	ar cqv libpdfras_writer.a $O
+	ar rcs libpdfras_writer.a $O
 
+# compile all the individual object modules
 md5.o: md5.c md5.h
 PdfAlloc.o: PdfAlloc.c  PdfAlloc.h PdfPlatform.h
 PdfArray.o: PdfArray.c  PdfArray.h PdfPlatform.h
@@ -45,3 +47,5 @@ PdfStrings.o: PdfStrings.c PdfStrings.h
 PdfValues.o: PdfValues.c PdfValues.h PdfString.h PdfStrings.h PdfDict.h PdfArray.h
 PdfXrefTable.o: PdfXrefTable.c PdfXrefTable.h
 
+clean:
+	@rm -f *.o *.a
