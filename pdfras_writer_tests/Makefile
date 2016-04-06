@@ -14,4 +14,5 @@ pdfras_writer_tests: pdfras_writer_tests.c ../common/test_support.c
 
 clean:
 	rm -rf *.dSYM
-	rm -f *. *.o
+	rm -f *.o
+	rm -f pdfras_writer_tests
