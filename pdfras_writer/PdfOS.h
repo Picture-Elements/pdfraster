@@ -35,4 +35,7 @@ extern char *pditoa(pdint32 i);
 extern char *pdftoa(pddouble n);
 extern char * pdftoaprecision(pddouble n, pddouble precision);
 
+// use this macro to suppress "unreferenced formal parameter" warnings
+#define UNUSED_FORMAL(x) ((void)(x))
+
 #endif

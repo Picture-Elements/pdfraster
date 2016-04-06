@@ -30,7 +30,6 @@ static void myMemSet(void *ptr, pduint8 value, size_t count)
 static int myOutputWriter(const pduint8 *data, pduint32 offset, pduint32 len, void *cookie)
 {
 	FILE *fp = (FILE *)cookie;
-	int i = 0;
 	if (!data || !len)
 		return 0;
 	data += offset;
@@ -58,11 +57,13 @@ t_pdatom AtomImg0;
 
 static void onimagedataready(t_datasink *sink, void *eventcookie)
 {
+    UNUSED_FORMAL(eventcookie);
 	pd_datasink_put(sink, _imdata, 0, sizeof(_imdata));
 }
 
 static void pagegen(t_pdcontents_gen *gen, void *cookie)
 {
+    UNUSED_FORMAL(cookie);
 	pd_gen_moveto(gen, 72-8, 288 - 8);
 	pd_gen_lineto(gen, 72 + 144 + 8, 288 - 8);
 	pd_gen_lineto(gen, 72 + 144 + 8, 288 + 144 + 8);
@@ -78,6 +79,8 @@ int main(int argc, char **argv)
 	FILE *fp;
 	t_OS os;
 
+    UNUSED_FORMAL(argc);
+    UNUSED_FORMAL(argv);
 	remove(output_name);
 	fopen_s(&fp, output_name, "wb");
 	os.alloc = mymalloc;
