@@ -5,8 +5,10 @@
 // The output is NOT meant to be a valid PDF/raster file, it's just a vanilla PDF.
 //
 #include <stdio.h>
-#include <malloc.h>
+#include <stdlib.h>
 #include <string.h>
+
+#include "portability.h"
 
 #include "PdfOS.h"
 #include "PdfAlloc.h"
@@ -82,7 +84,7 @@ int main(int argc, char **argv)
     UNUSED_FORMAL(argc);
     UNUSED_FORMAL(argv);
 	remove(output_name);
-	fopen_s(&fp, output_name, "wb");
+	fp = fopen(output_name, "wb");
 	os.alloc = mymalloc;
 	os.free = free;
 	os.memset = myMemSet;
