@@ -27,3 +27,4 @@ demo_raster_encoder/color_strip?.h
 demo_raster_encoder/gray8_page.h
 *.opendb
 pdfras_writer_tests
+demo_raster_encoder

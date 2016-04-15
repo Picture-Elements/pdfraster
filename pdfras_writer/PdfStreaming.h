@@ -16,9 +16,6 @@
 // to this many digits of precision:
 #define REAL_PRECISION 10
 
-typedef struct t_pdoutstream t_pdoutstream;
-typedef struct t_pdxref t_pdxref;
-
 extern t_pdoutstream *pd_outstream_new(t_pdmempool *allocsys, t_OS *os);
 extern void pd_outstream_free(t_pdoutstream *stm);
 

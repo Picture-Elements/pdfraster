@@ -39,7 +39,7 @@ static void *mymalloc(size_t bytes)
 }
 
 // tiny gray8 image, 8x8:
-static char _imdata[] = {
+static pduint8 _imdata[] = {
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 	0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20,
 	0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x40,
@@ -56,7 +56,7 @@ static char _imdata[] = {
 // slightly larger gray16 image:
 static pduint16 deepGrayData[64 * 512];
 
-static char bitonalData[((850 + 7) / 8) * 1100];
+static pduint8 bitonalData[((850 + 7) / 8) * 1100];
 
 // 24-bit RGB image data
 struct { unsigned char R, G, B; } colorData[175 * 100];

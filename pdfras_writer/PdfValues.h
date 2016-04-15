@@ -45,7 +45,8 @@ typedef struct t_pdstring t_pdstring;
 typedef struct t_pdhashatomtovalue t_pdhashatomtovalue;
 typedef struct t_pddict t_pddict;
 typedef struct t_pdreference t_pdreference;
-
+typedef struct t_pdxref t_pdxref;
+typedef struct t_pdoutstream t_pdoutstream;
 
 extern t_pdvalue pdnullvalue();
 extern t_pdvalue pderrvalue();

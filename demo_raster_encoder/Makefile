@@ -1,17 +1,33 @@
 
-WRITER = ../pdfras_writer
+# This is a makefile for building on non-Windows platforms.
 
-O = demo_raster_encoder.o
-A = $(WRITER)/libpdfras_writer.a
+H =	../common/portability.h \
+    ../pdfras_writer/PdfOS.h \
+    ../pdfras_writer/PdfAlloc.h \
+    ../pdfras_writer/PdfDict.h \
+    ../pdfras_writer/PdfStreaming.h \
+    ../pdfras_writer/PdfAtoms.h \
+    ../pdfras_writer/PdfStandardAtoms.h \
+    ../pdfras_writer/PdfXrefTable.h \
+    ../pdfras_writer/PdfImage.h \
+    ../pdfras_writer/PdfStandardObjects.h \
+    ../pdfras_writer/PdfContentsGenerator.h
 
-CFLAGS = -O -g -I$(WRITER)
-CC = gcc -std=gnu99
+CFLAGS = -O -g -I"../common" -I"../pdfras_writer" -lpdfras_writer
 
-demo_raster_encoder: $O $A
-	$(CC) -o demo_raster_encoder $O $A -lm
+LDFLAGS = -L../pdfras_writer
 
-demo_raster_encoder.o: demo_raster_encoder.c $(WRITER)/PdfRaster.h bw_ccitt_data.h color_page.h gray8_page.h \
-	color_strip0.h color_strip1.h color_strip2.h color_strip3.h
+LIBS = -lpdfras_writer
+
+demo_low_level: demo_low_level.c
+
+clean:
+	rm -rf *.dSYM
+	rm -f *.o
+	rm -f demo_low_level
+
+#demo_raster_encoder: demo_raster_encoder.c bw_ccitt_data.h color_page.h gray8_page.h \
+#	color_strip0.h color_strip1.h color_strip2.h color_strip3.h $(A)
 
 bw_ccitt_page.h: bw_ccitt_page.bin bin2carray.exe
 	./bin2carray.exe -i bw_ccitt_page.bin -s bw_ccitt_page_bin > bw_ccitt_data.h

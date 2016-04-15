@@ -5,8 +5,6 @@
 #include "PdfAlloc.h"
 #include "PdfStreaming.h"
 
-typedef struct t_pdxref t_pdxref;
-
 ///////////////////////////////////////////////////////////////////////
 // References (more or less, Indirect Objects)
 

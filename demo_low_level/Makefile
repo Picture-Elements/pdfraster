@@ -19,7 +19,7 @@ LDFLAGS = -L../pdfras_writer
 
 LIBS = -lpdfras_writer
 
-demo_low_level: demo_low_level.c
+demo_low_level: demo_low_level.c $(H)
 
 clean:
 	rm -rf *.dSYM
