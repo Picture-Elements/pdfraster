@@ -28,3 +28,4 @@ demo_raster_encoder/gray8_page.h
 *.opendb
 pdfras_writer_tests
 demo_raster_encoder
+libpdfras_reader.a

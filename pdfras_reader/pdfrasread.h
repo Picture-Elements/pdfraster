@@ -6,7 +6,7 @@
 extern "C" {
 #endif
 
-#include "pdfras_platform.h"
+#include "PdfPlatform.h"
 
 #ifndef TRUE
 #define TRUE 1

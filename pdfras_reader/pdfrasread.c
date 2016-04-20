@@ -4,6 +4,7 @@
 #include <string.h>
 #include <ctype.h>
 #include <assert.h>
+#include <limits.h>
 
 ///////////////////////////////////////////////////////////////////////
 // Data Structures & Types
@@ -23,7 +24,7 @@ typedef struct t_pdfrasreader {
 	int					apiLevel;			// caller's specified API level.
 	pdfras_freader		fread;				// function for reading from source
 	pdfras_fcloser		fclose;				// source closer
-	bool				bOpen;				// whether this reader is open
+	pdbool				bOpen;				// whether this reader is open
 	void*				source;				// cookie/handle to caller-defined source
 	pduint32			filesize;			// source size, in bytes
 	struct {
@@ -49,7 +50,7 @@ typedef struct t_pdfrasreader {
 static char * strrstr(char * haystack, const char * needle)
 {
 	char *temp = haystack, *before = NULL;
-	while (temp = strstr(temp, needle)) before = temp++;
+	while ((temp = strstr(temp, needle))) before = temp++;
 	return before;
 }
 
@@ -438,9 +439,9 @@ static int token_hex_string(t_pdfrasreader* reader, pduint32* poff)
 	}
 	do {
 		ch = nextch(reader, &off);
-	} while (ch >= '0' && ch <= '9' ||
-		(ch >= 'A' && ch <= 'F') ||
-		(ch >= 'a' && ch <= 'f') ||
+	} while ((ch >= '0' && ch <= '9') ||
+		 (ch >= 'A' && ch <= 'F') ||
+		 (ch >= 'a' && ch <= 'f') ||
 		isspace(ch));
 	if (ch != '>') {
 		// unexpected character in hexadecimal string
@@ -577,7 +578,7 @@ static int parse_dictionary(t_pdfrasreader* reader, pduint32 *poff)
 // Otherwise return FALSE and leave *poff unmoved.
 // If a stream is found, set *pstream to the position of the stream data, and *plen to its length in bytes.
 // Values are only returned through pstream or plen if they are non-NULL.
-static parse_dictionary_or_stream(t_pdfrasreader* reader, pduint32 *poff, pduint32 *pstream, long* plen)
+static int parse_dictionary_or_stream(t_pdfrasreader* reader, pduint32 *poff, pduint32 *pstream, long* plen)
 {
 	pduint32 off = *poff;
 	if (!parse_dictionary(reader, &off)) {
@@ -1356,7 +1357,7 @@ size_t pdfrasread_max_strip_size(t_pdfrasreader* reader, int p)
 	return info.max_strip_size;
 }
 
-static find_strip(t_pdfrasreader* reader, int p, int s, pduint32* pstrip)
+static int find_strip(t_pdfrasreader* reader, int p, int s, pduint32* pstrip)
 {
 	char stripname[32];
 
@@ -1437,7 +1438,7 @@ int pdfras_recognize_signature(const void* sig)
 	else {
 		return FALSE;
 	}
-	if (0 != strncmp(p, "%®âš†er-", 8)) {
+	if (0 != strncmp(p, "%\xAE\xE2\x9A\x86" "er-", 8)) {
 		return FALSE;
 	}
 	p += 8;
@@ -1510,7 +1511,7 @@ int pdfrasread_open(t_pdfrasreader* reader, void* source)
 	}
 	reader->source = source;
 	if (parse_trailer(reader)) {
-		reader->bOpen = true;
+		reader->bOpen = PD_TRUE;
 	}
 	else {
 		reader->source = NULL;
@@ -1538,7 +1539,7 @@ int pdfrasread_close(t_pdfrasreader* reader)
 		if (reader->fclose) {
 			reader->fclose(reader->source);
 		}
-		reader->bOpen = false;
+		reader->bOpen = PD_FALSE;
 		return TRUE;
 	}
 	return FALSE;

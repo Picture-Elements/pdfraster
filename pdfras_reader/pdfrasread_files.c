@@ -1,7 +1,7 @@
 #include "pdfrasread_files.h"
 #include <string.h>
 #include <ctype.h>
-#include "..\pdfras_writer\PdfPlatform.h"
+#include "PdfPlatform.h"
 
 // Return TRUE if the file starts with the signature of a PDF/raster file.
 // FALSE otherwise.
