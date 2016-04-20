@@ -1,6 +1,8 @@
 
 # This is a makefile for building on non-Windows platforms.
 
+PROGRAM= demo_low_level
+
 H =	../common/portability.h \
     ../pdfras_writer/PdfOS.h \
     ../pdfras_writer/PdfAlloc.h \
@@ -19,9 +21,7 @@ LDFLAGS = -L../pdfras_writer
 
 LIBS = -lpdfras_writer
 
-demo_low_level: demo_low_level.c $(H)
+$(PROGRAM): demo_low_level.c
 
 clean:
-	rm -rf *.dSYM
-	rm -f *.o
-	rm -f demo_low_level
+	rm -rf *.dSYM *.o $(PROGRAM)

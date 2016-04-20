@@ -1,6 +1,8 @@
 
 # This is a makefile for building on non-Windows platforms.
 
+PROGRAM= demo_raster_encoder
+
 H =	../common/portability.h \
     ../pdfras_writer/PdfOS.h \
     ../pdfras_writer/PdfAlloc.h \
@@ -19,15 +21,10 @@ LDFLAGS = -L../pdfras_writer
 
 LIBS = -lpdfras_writer
 
-demo_low_level: demo_low_level.c
+$(PROGRAM): demo_raster_encoder.c
 
-clean:
-	rm -rf *.dSYM
-	rm -f *.o
-	rm -f demo_low_level
-
-#demo_raster_encoder: demo_raster_encoder.c bw_ccitt_data.h color_page.h gray8_page.h \
-#	color_strip0.h color_strip1.h color_strip2.h color_strip3.h $(A)
+#demo_raster_encoder.c bw_ccitt_data.h color_page.h gray8_page.h \
+#	color_strip0.h color_strip1.h color_strip2.h color_strip3.h $(H)
 
 bw_ccitt_page.h: bw_ccitt_page.bin bin2carray.exe
 	./bin2carray.exe -i bw_ccitt_page.bin -s bw_ccitt_page_bin > bw_ccitt_data.h
@@ -52,3 +49,6 @@ color_strip3.h: color_strip3.jpg bin2carray.exe
 
 bin2carray.exe: bin2carray.c
 	$(CC) -o bin2carray.exe bin2carray.c
+
+clean:
+	rm -rf *.dSYM *.o $(PROGRAM)
