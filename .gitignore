@@ -29,3 +29,4 @@ demo_low_level/demo_low_level
 pdfras_writer_tests/pdfras_writer_tests
 reader_test/reader_test
 demo_raster_encoder/*.pdf
+*.VC.db
