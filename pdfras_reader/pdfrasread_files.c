@@ -3,17 +3,38 @@
 #include <ctype.h>
 #include "PdfPlatform.h"
 
-// Return TRUE if the file starts with the signature of a PDF/raster file.
+// Some private helper functions
+static size_t file_reader(void *source, pduint32 offset, size_t length, char *buffer)
+{
+    FILE* f = (FILE*)source;
+    if (0 != fseek(f, offset, SEEK_SET)) {
+        return 0;
+    }
+    return fread(buffer, sizeof(pduint8), length, f);
+}
+
+static void file_closer(void* source)
+{
+    if (source) {
+        FILE* f = (FILE*)source;
+        fclose(f);
+    }
+}
+
+
+// Return TRUE if the file 'claims to be' a PDF/raster file.
 // FALSE otherwise.
 int pdfrasread_recognize_file(FILE* f)
 {
-	if (!f) {
-		return FALSE;
-	}
-	char sig[32];
-	size_t nb = fread(sig, sizeof(char), sizeof sig - 1, f);
-	sig[nb] = (char)0;
-	return pdfras_recognize_signature(sig);
+    int bYes = FALSE;
+    if (f) {
+        t_pdfrasreader* reader = pdfrasread_create(PDFRAS_API_LEVEL, &file_reader, NULL);
+        if (reader) {
+            bYes = pdfrasread_recognize(reader, f);
+            pdfrasread_destroy(reader);
+        }
+    }
+    return bYes;
 }
 
 // Return TRUE if the file starts with the signature of a PDF/raster file.
@@ -27,23 +48,6 @@ int pdfrasread_recognize_filename(const char* fn)
 		fclose(f);
 	}
 	return bResult;
-}
-
-static size_t file_reader(void *source, pduint32 offset, size_t length, char *buffer)
-{
-	FILE* f = (FILE*)source;
-	if (0 != fseek(f, offset, SEEK_SET)) {
-		return 0;
-	}
-	return fread(buffer, sizeof(pduint8), length, f);
-}
-
-static void file_closer(void* source)
-{
-	if (source) {
-		FILE* f = (FILE*)source;
-		fclose(f);
-	}
 }
 
 // Return the page count of the PDF/raster file f

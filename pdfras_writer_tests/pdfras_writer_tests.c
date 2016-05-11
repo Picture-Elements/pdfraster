@@ -1711,25 +1711,13 @@ void test_file_structure()
 	buffer.pos = 0;										// reset the memory buffer
 
 	// Test the function: pd_write_pdf_header
-	pd_write_pdf_header(out, "1.4", NULL);
+	pd_write_pdf_header(out, "1.4");
 	ASSERT(0 == strcmp(output, "%PDF-1.4\n%\xE2\xE3\xCF\xD3\n"));
-
-	buffer.pos = 0;
-	pd_write_pdf_header(out, "2.0", "xyzzy");
-	ASSERT(0 == strcmp(output, "%PDF-2.0\nxyzzy\n"));
-	// doesn't matter if 2nd line ends with \n or not
-	buffer.pos = 0;
-	pd_write_pdf_header(out, "2.0", "xyzzy\n");
-	ASSERT(0 == strcmp(output, "%PDF-2.0\nxyzzy\n"));
-	// to have 'no' 2nd line
-	buffer.pos = 0;
-	pd_write_pdf_header(out, "2.0", "\n");
-	ASSERT(0 == strcmp(output, "%PDF-2.0\n\n"));
 
 	// Test pd_write_endofdocument
 	buffer.pos = 0;
 	pd_write_endofdocument(out, NULL, pdnullvalue(), pdnullvalue());
-	ASSERT(0 == strcmp(output, "trailer\n<< /Size 0 /Root null /Info null /ID [ <D41D8CD98F00B204E9800998ECF8427E> <D41D8CD98F00B204E9800998ECF8427E> ] >>\nstartxref\n55\n%%EOF\n"));
+	ASSERT(0 == strcmp(output, "trailer\n<< /Size 0 /Root null /Info null /ID [ <D41D8CD98F00B204E9800998ECF8427E> <D41D8CD98F00B204E9800998ECF8427E> ] >>\nstartxref\n15\n%%EOF\n"));
 
 	// construct minimal versions of everything pd_write_endofdocument wants.
 	t_pdvalue DID = pd_dict_new(pool, 0);
@@ -1738,7 +1726,7 @@ void test_file_structure()
 	// refresh the output stream
 	buffer.pos = 0; pd_outstream_free(out); out = pd_outstream_new(pool, &os);
 	// write out a 'classic' PDF header
-	pd_write_pdf_header(out, "1.6", "%\xE2\xE3\xCF\xD3");
+	pd_write_pdf_header(out, "1.6");
 	// then write out all the ending stuff.
 	pd_write_endofdocument(out, xref, catalog, DID);
 	ASSERT(0 == pd_strcmp(output,

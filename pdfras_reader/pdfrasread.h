@@ -1,6 +1,10 @@
 #ifndef _H_pdfrasread
 #define _H_pdfrasread
 #pragma once
+// This API provides an interface for reading byte streams
+// that follow the PDF/raster format.
+// It does not use or depend on files, or depend on any
+// platform services related to files, directories or streams.
 
 #ifdef __cplusplus
 extern "C" {
@@ -43,10 +47,6 @@ typedef void (*pdfras_fcloser)(void *source);
 
 typedef struct t_pdfrasreader t_pdfrasreader;
 
-// Return TRUE if the string at sig starts with the signature of a PDF/raster file.
-// FALSE otherwise.
-int pdfras_recognize_signature(const void* sig);
-
 // Create a PDF/raster reader in the closed state.
 // Return NULL if a reader can't be constructed - typically that can only be a malloc failure.
 t_pdfrasreader* pdfrasread_create(int apiLevel, pdfras_freader readfn, pdfras_fcloser closefn);
@@ -56,31 +56,46 @@ t_pdfrasreader* pdfrasread_create(int apiLevel, pdfras_freader readfn, pdfras_fc
 void pdfrasread_destroy(t_pdfrasreader* reader);
 
 // Open a PDF/raster source for reading.
-// If successful, records the source, sets the state to open, returns TRUE.
-// Otherwise returns FALSE.
-// Fails if the reader is already open.
-// Fails if the source does not pass initial parsing/tests for PDF/raster.
+// If successful, records the source, sets the state to open and returns TRUE.
+// Otherwise it returns FALSE.
+// This function fails if the reader is already open.
+// It also fails if the source does not pass initial parsing/tests for PDF/raster.
+// No assumptions are made about the source parameter, it is only stored,
+// and passed to the readfn and closefn of the reader.
 int pdfrasread_open(t_pdfrasreader* reader, void* source);
+
+// Check if a source 'claims to be' or is marked as, a PDF/raster stream.
+// Returns TRUE if there are no errors and the source is marked as PDF/raster.
+// Returns FALSE otherwise.
+// If the reader is open it will be closed immediately by this function.
+// On return the reader will be in a closed state.
+// The source may or may not be temporarily opened on this reader during this function.
+int pdfrasread_recognize(t_pdfrasreader* reader, void* source);
 
 // Return TRUE if reader has a PDF/raster stream open,
 // return FALSE otherwise.
 int pdfrasread_is_open(t_pdfrasreader* reader);
 
-// Return the associated 'source' from the last successful open,
-// or NULL if reader is NULL or has never been open.
+// Return the source parameter of the last successful open of this reader.
+// Returns NULL if reader is NULL or has never been open.
 // To tell if reader is currently open use pdfrasread_is_open, not this.
 void* pdfrasread_source(t_pdfrasreader* reader);
 
-// Close this reader - disconnect from associated source.
-// (really just calls the closefn from when the reader was constructed)
-// If reader is not open, does nothing but return TRUE.
+// Move a reader to the closed state and disconnect it from associated source.
+// This calls the closefn used to create the reader, then resets the
+// source associated with this reader to NULL.
+// If reader is not open, does nothing and returns TRUE.
+// After this call succeeds, pdfrasread_is_open(reader) will return FALSE.
 int pdfrasread_close(t_pdfrasreader* reader);
 
-// Return the number of pages in the associated PDF/raster file
+// Return the number of pages in the associated PDF/raster file.
+// Only valid if reader is valid (was returned by pdfrasread_create and
+// not subsequently destroyed) and is open.
 // -1 in case of error.
 int pdfrasread_page_count(t_pdfrasreader* reader);
 
 // Return the pixel format of the raster image of page n (indexed from 0)
+// Similar restrictions as pdfrasread_page_count.
 RasterPixelFormat pdfrasread_page_format(t_pdfrasreader* reader, int n);
 
 // Return the pixel width of the raster image of page n
@@ -106,6 +121,8 @@ size_t pdfrasread_max_strip_size(t_pdfrasreader* reader, int p);
 
 // Read the raw (compressed) data of strip s on page p into buffer
 // Returns the actual number of bytes read.
+// Note that if the the strip is larger than bufsize, no data is read and
+// the return value will be 0.
 size_t pdfrasread_read_raw_strip(t_pdfrasreader* reader, int p, int s, void* buffer, size_t bufsize);
 
 

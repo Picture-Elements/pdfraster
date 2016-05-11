@@ -13,9 +13,6 @@
 #include "PdfImage.h"
 #include "PdfArray.h"
 
-// Version of the file format we 
-#define PDFRASTER_SPEC_VERSION "1.0"
-
 typedef struct t_pdfrasencoder {
 	t_pdmempool*		pool;
 	int					apiLevel;			// caller's specified API level.
@@ -106,8 +103,8 @@ t_pdfrasencoder* pdfr_encoder_create(int apiLevel, t_OS *os)
 		pd_dict_put(enc->info, PDA_CreationDate, pd_make_time_string(pool, enc->creationDate));
 		// we don't modify PDF so there is no ModDate
 
-		// Write the PDF header, with the PDF/raster 2nd line comment:
-		pd_write_pdf_header(enc->stm, "1.4", "%\xAE\xE2\x9A\x86" "er-" PDFRASTER_SPEC_VERSION "\n");
+		// Write the PDF header:
+		pd_write_pdf_header(enc->stm, "1.4");
 	}
 	return enc;
 }

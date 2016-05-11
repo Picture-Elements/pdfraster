@@ -122,7 +122,7 @@ int main(int argc, char **argv)
 	pd_dict_put(info, PDA_Author, pdcstrvalue(os.allocsys, "Charles Dickens"));
 	pd_dict_put(info, PDA_Subject, pdcstrvalue(os.allocsys, "French Revolution"));
 
-	pd_write_pdf_header(stm, "1.4", NULL);
+	pd_write_pdf_header(stm, "1.4");
 	pd_write_endofdocument(stm, xref, catalog, info);
 
 	pd_xref_free(xref);

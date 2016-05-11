@@ -12,6 +12,9 @@ extern "C" {
 
 #define PDFRAS_API_LEVEL	1
 
+// Version of the file format we support (or at least, write)
+#define PDFRASTER_SPEC_VERSION "1.0"
+
 #define PDFRAS_LIBRARY_VERSION "0.10"
 // 0.10	spike	2016.03.11	new: pd_format_xmp_time, renamed pd_get_time_string => pd_format_time
 // 0.9	spike	2015.12.01	multi-strip working

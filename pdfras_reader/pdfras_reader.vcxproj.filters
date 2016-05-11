@@ -17,9 +17,6 @@
     <ClInclude Include="pdfrasread.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="pdfras_platform.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pdfrasread_files.c">

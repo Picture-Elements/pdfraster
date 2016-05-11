@@ -73,10 +73,7 @@ extern void pd_write_reference_declaration(t_pdoutstream *stm, t_pdvalue ref);
 
 // Write the PDF header to the stream.
 // version is a string with the header version e.g. "1.4".
-// line2 is a string to be written after the first line of the header.
-// if line2 is NULL, a conventional 2nd line comment is written e.g. "%0xE2\xE3\xCF\xD3\n"
-// To suppress the 2nd line comment, use line2="" or line2="\n".
-extern void pd_write_pdf_header(t_pdoutstream *stm, char *version, char *line2);
+extern void pd_write_pdf_header(t_pdoutstream *stm, char *version);
 
 // Write all the stuff that goes at the end of a PDF, to a stream.
 extern void pd_write_endofdocument(t_pdoutstream *stm, t_pdxref *xref, t_pdvalue catalog, t_pdvalue info);

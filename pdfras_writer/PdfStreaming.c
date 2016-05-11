@@ -407,20 +407,14 @@ void pd_write_reference_declaration(t_pdoutstream *stm, t_pdvalue ref)
 	}
 }
 
-void pd_write_pdf_header(t_pdoutstream *stm, char *version, char *line2)
+void pd_write_pdf_header(t_pdoutstream *stm, char *version)
 {
-	if (!line2) {
-		// default is the conventional 2nd line comment that marks the
-		// file as not being 7-bit ASCII:
-		line2 = "%\xE2\xE3\xCF\xD3\n";
-	}
+    // the conventional 2nd line comment that marks the
+    // file as not being 7-bit ASCII:
 	pd_puts(stm, "%PDF-");
 	pd_puts(stm, version);
 	pd_putc(stm, '\n');
-	pd_puts(stm, line2);
-	if (line2[pdstrlen(line2) - 1] != '\n') {
-		pd_putc(stm, '\n');
-	}
+	pd_puts(stm, "%\xE2\xE3\xCF\xD3\n");
 }
 
 static pdbool freeTrailerEntry(t_pdatom atom, t_pdvalue value, void *cookie)
@@ -452,6 +446,7 @@ void pd_write_endofdocument(t_pdoutstream *stm, t_pdxref *xref, t_pdvalue catalo
 		pd_write_value(stm, trailer);
 		// write the EOF sequence, including pointer to XREF table
 		pd_putc(stm, '\n');
+        pd_puts(stm, "%\xAE\xE2\x9A\x86" "er-" PDFRASTER_SPEC_VERSION "\n");
 		pd_puts(stm, "startxref\n");
 		pd_putint(stm, pos);
 		pd_puts(stm, "\n%%EOF\n");

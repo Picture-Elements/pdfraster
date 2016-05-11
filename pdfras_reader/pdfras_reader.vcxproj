@@ -13,7 +13,6 @@
   <ItemGroup>
     <ClInclude Include="pdfrasread_files.h" />
     <ClInclude Include="pdfrasread.h" />
-    <ClInclude Include="pdfras_platform.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pdfrasread_files.c" />

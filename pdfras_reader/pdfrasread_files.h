@@ -9,11 +9,11 @@
 extern "C" {
 #endif
 
-// Return TRUE if the file starts with the signature of a PDF/raster file.
+// Return TRUE if the file is marked as a PDF/raster file.
 // FALSE otherwise.
 int pdfrasread_recognize_file(FILE* f);
 
-// Return TRUE if the file starts with the signature of a PDF/raster file.
+// Return TRUE if the file is marked as a PDF/raster file.
 // FALSE otherwise.
 int pdfrasread_recognize_filename(const char* fn);
 

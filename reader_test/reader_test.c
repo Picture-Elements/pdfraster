@@ -16,32 +16,6 @@
 void signature_tests()
 {
 	printf("--signature recognition\n");
-	ASSERT(0 == pdfras_recognize_signature(0));
-	ASSERT(0 == pdfras_recognize_signature(""));
-	ASSERT(0 == pdfras_recognize_signature("PDF-1.4\n%\xAE\xE2\x9A\x86" "er-1.0\n"));
-	ASSERT(1 == pdfras_recognize_signature("%PDF-1.4\r\n%\xAE\xE2\x9A\x86" "er-1.0\r\n"));
-	ASSERT(1 == pdfras_recognize_signature("%PDF-1.4\r%\xAE\xE2\x9A\x86" "er-1.0\r"));
-	ASSERT(1 == pdfras_recognize_signature("%PDF-1.4\n%\xAE\xE2\x9A\x86" "er-1.0\n"));
-	ASSERT(1 == pdfras_recognize_signature("%PDF-1.4\n%\xAE\xE2\x9A\x86" "er-1.1\n"));
-	ASSERT(1 == pdfras_recognize_signature("%PDF-1.5\n%\xAE\xE2\x9A\x86" "er-1.2\n"));
-	ASSERT(1 == pdfras_recognize_signature("%PDF-1.6\n%\xAE\xE2\x9A\x86" "er-1.3\n"));
-	ASSERT(1 == pdfras_recognize_signature("%PDF-1.7\n%\xAE\xE2\x9A\x86" "er-10.27\n"));
-	ASSERT(0 == pdfras_recognize_signature("%PDF-1.4\n\n%\xAE\xE2\x9A\x86" "er-1.0\r\n"));
-	ASSERT(0 == pdfras_recognize_signature("%PDF"));
-	ASSERT(0 == pdfras_recognize_signature("%PDF-1.\n"));
-	ASSERT(0 == pdfras_recognize_signature("%PDF-1.4\n"));
-	ASSERT(0 == pdfras_recognize_signature("%PDF-1.4\n%"));
-	ASSERT(0 == pdfras_recognize_signature("%PDF-1.4\n%\xAE\xE2\x9A\x86" "er"));
-	ASSERT(0 == pdfras_recognize_signature("%PDF-1.4\r\n%\xAE\xE2\x9A\x86" "er\r\n"));
-	ASSERT(0 == pdfras_recognize_signature("%PDF-1.4\r\n%\xAE\xE2\x9A\x86" "er-\r\n"));
-	ASSERT(0 == pdfras_recognize_signature("%PDF-1.4\r\n%\xAE\xE2\x9A\x86" "er-1\r\n"));
-	ASSERT(0 == pdfras_recognize_signature("%PDF-1.4\r\n%\xAE\xE2\x9A\x86" "er-1.\r\n"));
-	ASSERT(0 == pdfras_recognize_signature("%PDF-1.4\r\n%\xAE\xE2\x9A\x86" "e-1.0\r\n"));
-	// check for missing dots and dashes
-	ASSERT(0 == pdfras_recognize_signature("%PDF-14\r\n%\xAE\xE2\x9A\x86" "er-1.0\r\n"));
-	ASSERT(0 == pdfras_recognize_signature("%PDF-1.4\r\n%\xAE\xE2\x9A\x86" "er-10\r\n"));
-	ASSERT(0 == pdfras_recognize_signature("%PDF1.4\r\n%\xAE\xE2\x9A\x86" "er-1.0\r\n"));
-	ASSERT(0 == pdfras_recognize_signature("%PDF-1.4\r\n%\xAE\xE2\x9A\x86" "er1.0\r\n"));
 	// check that it works with files
 	ASSERT(0 == pdfrasread_recognize_file(NULL));
 	ASSERT(0 == pdfrasread_recognize_filename("exists.not"));

@@ -1519,6 +1519,15 @@ int pdfrasread_open(t_pdfrasreader* reader, void* source)
 	return reader->bOpen;
 }
 
+int pdfrasread_recognize(t_pdfrasreader* reader, void* source)
+{
+    int bYes = FALSE;
+    pdfrasread_close(reader);
+    bYes = pdfrasread_open(reader, source);
+    pdfrasread_close(reader);
+    return bYes;
+}
+
 void* pdfrasread_source(t_pdfrasreader* reader)
 {
 	if (reader) {
