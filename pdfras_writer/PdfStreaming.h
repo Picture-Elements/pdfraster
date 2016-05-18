@@ -16,7 +16,21 @@
 // to this many digits of precision:
 #define REAL_PRECISION 10
 
+
+// output event codes
+typedef enum {
+    PDF_OUTPUT_STARTXREF,		// just before startxref is emitted
+    PDF_OUTPUT_EVENT_COUNT
+} PdfOutputEventCode;
+
+// Signature of callback that can be attached to various
+// events that occur while PDF stream is being generated.
+typedef int (*fOutStreamEventHandler)(t_pdoutstream *stm, void* cookie, PdfOutputEventCode eventid);
+
+// Create a new PDF output stream
 extern t_pdoutstream *pd_outstream_new(t_pdmempool *allocsys, t_OS *os);
+
+// Destroy a PDF output stream
 extern void pd_outstream_free(t_pdoutstream *stm);
 
 // Attach an 'encrypter' to this stream.
@@ -77,5 +91,13 @@ extern void pd_write_pdf_header(t_pdoutstream *stm, char *version);
 
 // Write all the stuff that goes at the end of a PDF, to a stream.
 extern void pd_write_endofdocument(t_pdoutstream *stm, t_pdxref *xref, t_pdvalue catalog, t_pdvalue info);
+
+// attach an event handler to an output event on a PDF output stream.
+// setting a NULL handler is valid and means 'no event handler'.
+extern void pd_outstream_set_event_handler(t_pdoutstream *stm, PdfOutputEventCode eventid, fOutStreamEventHandler handler, void *cookie);
+
+// Invoke the event handler, if any, attached to the specified event on this stream.
+// The event handler is called with the stream, the cookie, the eventid, and the arglist.
+extern int pd_outstream_fire_event(t_pdoutstream *stm, PdfOutputEventCode eventid);
 
 #endif

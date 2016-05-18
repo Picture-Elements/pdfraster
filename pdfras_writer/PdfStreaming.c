@@ -14,16 +14,31 @@ typedef struct t_pdoutstream {
 	t_pdencrypter *encrypter;
 	void *writercookie;
 	pduint32 pos;
+    fOutStreamEventHandler eventHandler[PDF_OUTPUT_EVENT_COUNT];
+    void* eventCookie[PDF_OUTPUT_EVENT_COUNT];
 } t_pdoutstream;
+
+int pd_outstream_fire_event(t_pdoutstream *stm, PdfOutputEventCode eventid)
+{
+    int result = -1;
+    if (stm && eventid >= 0 && eventid < PDF_OUTPUT_EVENT_COUNT) {
+        fOutStreamEventHandler handler = stm->eventHandler[eventid];
+        void* cookie = stm->eventCookie[eventid];
+        if (handler) {
+            result = handler(stm, cookie, eventid);
+        }
+    }
+    return result;
+}
 
 t_pdoutstream *pd_outstream_new(t_pdmempool *pool, t_OS *os)
 {
 	t_pdoutstream *stm = (t_pdoutstream *)pd_alloc(pool, sizeof(t_pdoutstream));
 	if (stm)
-	{
+	{   // note allocated block is 0-filled
 		stm->writer = os->writeout;
 		stm->writercookie = os->writeoutcookie;
-		stm->pos = 0;
+		// stm->pos = 0;    // redundant
 	}
 	return stm;
 }
@@ -446,7 +461,7 @@ void pd_write_endofdocument(t_pdoutstream *stm, t_pdxref *xref, t_pdvalue catalo
 		pd_write_value(stm, trailer);
 		// write the EOF sequence, including pointer to XREF table
 		pd_putc(stm, '\n');
-        pd_puts(stm, "%\xAE\xE2\x9A\x86" "er-" PDFRASTER_SPEC_VERSION "\n");
+        pd_outstream_fire_event(stm, PDF_OUTPUT_STARTXREF);
 		pd_puts(stm, "startxref\n");
 		pd_putint(stm, pos);
 		pd_puts(stm, "\n%%EOF\n");
