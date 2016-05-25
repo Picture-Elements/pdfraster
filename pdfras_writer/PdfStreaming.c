@@ -18,6 +18,15 @@ typedef struct t_pdoutstream {
     void* eventCookie[PDF_OUTPUT_EVENT_COUNT];
 } t_pdoutstream;
 
+void pd_outstream_set_event_handler(t_pdoutstream *stm, PdfOutputEventCode eventid, fOutStreamEventHandler handler, void *cookie)
+{
+    if (stm && eventid >= 0 && eventid < PDF_OUTPUT_EVENT_COUNT) {
+        stm->eventHandler[eventid] = handler;
+        stm->eventCookie[eventid] = cookie;
+    }
+}
+
+
 int pd_outstream_fire_event(t_pdoutstream *stm, PdfOutputEventCode eventid)
 {
     int result = -1;
@@ -452,6 +461,7 @@ void pd_write_endofdocument(t_pdoutstream *stm, t_pdxref *xref, t_pdvalue catalo
 		pd_dict_put(trailer, PDA_ID, file_id);
 
 		pd_xref_writeallpendingreferences(xref, stm);
+        pd_outstream_fire_event(stm, PDF_OUTPUT_BEFORE_XREF);
 		// note the position of the XREF table
 		pduint32 pos = pd_outstream_pos(stm);
 		// write the XREF table

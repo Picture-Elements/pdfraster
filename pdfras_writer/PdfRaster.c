@@ -453,7 +453,7 @@ void pdfr_encoder_end_document(t_pdfrasencoder* enc)
 {
     t_pdoutstream* stm = enc->stm;
 	pdfr_encoder_end_page(enc);
-    pd_outstream_set_event_handler(stm, PDF_OUTPUT_STARTXREF, pdfr_write_trailer_sig, NULL);
+    pd_outstream_set_event_handler(stm, PDF_OUTPUT_BEFORE_XREF, pdfr_write_trailer_sig, NULL);
 	pd_write_endofdocument(stm, enc->xref, enc->catalog, enc->info);
 	pd_xref_free(enc->xref); enc->xref = NULL;
 	pd_atom_table_free(enc->atoms); enc->atoms = NULL;

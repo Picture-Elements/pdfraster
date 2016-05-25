@@ -19,6 +19,7 @@
 
 // output event codes
 typedef enum {
+    PDF_OUTPUT_BEFORE_XREF,     // just before xref table is emitted
     PDF_OUTPUT_STARTXREF,		// just before startxref is emitted
     PDF_OUTPUT_EVENT_COUNT
 } PdfOutputEventCode;

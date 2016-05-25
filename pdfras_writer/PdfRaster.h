@@ -15,7 +15,8 @@ extern "C" {
 // Version of the file format we support (or at least, write)
 #define PDFRASTER_SPEC_VERSION "1.0"
 
-#define PDFRAS_LIBRARY_VERSION "0.11"
+#define PDFRAS_LIBRARY_VERSION "0.12"
+// 0.12 spike   2016.05.24  moved signature to before xref table
 // 0.11 spike   2016.05.18  correctly output PDF/raster signature in trailer
 // 0.10	spike	2016.03.11	new: pd_format_xmp_time, renamed pd_get_time_string => pd_format_time
 // 0.9	spike	2015.12.01	multi-strip working

@@ -120,6 +120,11 @@ $(TargetDir)xxd -i color_strip3.jpg color_strip3.h
     <Image Include="color_strip3.jpg" />
     <Image Include="gray8_page.jpg" />
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\pdfras_writer\pdfras_writer.vcxproj">
+      <Project>{f96f701b-73f9-4bab-ba84-ceff8a112289}</Project>
+    </ProjectReference>
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
