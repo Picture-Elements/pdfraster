@@ -24,6 +24,7 @@ typedef struct t_pdfrasencoder {
 	t_pdxref*			xref;
 	t_pdvalue			catalog;
 	t_pdvalue			info;
+	t_pdvalue			trailer;
 	// optional document objects
 	t_pdvalue			srgbColorspace;		// ICCBased sRGB colorspace
 	// current page object and related values
@@ -73,7 +74,8 @@ t_pdfrasencoder* pdfr_encoder_create(int apiLevel, t_OS *os)
 		return NULL;
 	}
 	assert(os);
-	pool = os->allocsys;
+	// create a memory management pool for the internal use of this encoder.
+	pool = pd_alloc_new_pool(os);
 	assert(pool);
 
 	t_pdfrasencoder *enc = (t_pdfrasencoder *)pd_alloc(pool, sizeof(t_pdfrasencoder));
@@ -81,27 +83,32 @@ t_pdfrasencoder* pdfr_encoder_create(int apiLevel, t_OS *os)
 	{
 		enc->pool = pool;						// associated allocation pool
 		enc->apiLevel = apiLevel;				// level of this API assumed by caller
-		enc->stm = pd_outstream_new(pool, os);
+		enc->stm = pd_outstream_new(pool, os);	// our PDF-output stream abstraction
 
-		enc->xdpi = enc->ydpi = 300;			// default
-		enc->rotation = 0;						// default (& redundant)
-		enc->compression = PDFRAS_UNCOMPRESSED;	// default
-		enc->pixelFormat = PDFRAS_BITONAL;		// default
+		enc->xdpi = enc->ydpi = 300;			// default resolution
+		enc->rotation = 0;						// default page rotation
+		enc->compression = PDFRAS_UNCOMPRESSED;	// default compression
+		enc->pixelFormat = PDFRAS_BITONAL;		// default pixel format
 		// initial atom table
 		enc->atoms = pd_atom_table_new(pool, 128);
 		// empty cross-reference table:
 		enc->xref = pd_xref_new(pool);
 		// initial document catalog:
 		enc->catalog = pd_catalog_new(pool, enc->xref);
-		
+
 		// create 'info' dictionary
 		enc->info = pd_info_new(pool, enc->xref);
+		// and trailer dictionary
+		enc->trailer = pd_trailer_new(pool, enc->xref, enc->catalog, enc->info);
 		// default Producer
 		pd_dict_put(enc->info, PDA_Producer, pdcstrvalue(pool, "PdfRaster encoder " PDFRAS_LIBRARY_VERSION));
 		// record creation date & time:
 		time(&enc->creationDate);
 		pd_dict_put(enc->info, PDA_CreationDate, pd_make_time_string(pool, enc->creationDate));
 		// we don't modify PDF so there is no ModDate
+
+		assert(IS_NULL(enc->srgbColorspace));
+		assert(IS_NULL(enc->currentPage));
 
 		// Write the PDF header:
 		pd_write_pdf_header(enc->stm, "1.4");
@@ -443,9 +450,34 @@ int pdfr_encoder_end_page(t_pdfrasencoder* enc)
 	return 0;
 }
 
-static int pdfr_write_trailer_sig(t_pdoutstream *stm, void* cookie, PdfOutputEventCode eventid)
+int pdfr_encoder_page_count(t_pdfrasencoder* enc)
 {
-    pd_puts(stm, "%\xAE\xE2\x9A\x86" "er-" PDFRASTER_SPEC_VERSION "\n");
+	int pageCount = -1;
+	if (enc) {
+		pdbool succ;
+		t_pdvalue pagesdict = pd_dict_get(enc->catalog, PDA_Pages, &succ);
+		assert(succ);
+		if (succ) {
+			t_pdvalue count = pd_dict_get(pagesdict, PDA_Count, &succ);
+			assert(succ);
+			assert(IS_INT(count));
+			pageCount = count.value.intvalue;
+			if (!IS_NULL(enc->currentPage)) {
+				pageCount++;
+			}
+		}
+	}
+	return pageCount;
+}
+
+long pdfr_encoder_bytes_written(t_pdfrasencoder* enc)
+{
+	return pd_outstream_pos(enc->stm);
+}
+
+static int pdfr_write_sig(t_pdvalue trailer, t_pdoutstream *stm)
+{
+    pd_puts(stm, "\n%PDF-raster-" PDFRASTER_SPEC_VERSION "\n");
     return 0;
 }
 
@@ -453,15 +485,21 @@ void pdfr_encoder_end_document(t_pdfrasencoder* enc)
 {
     t_pdoutstream* stm = enc->stm;
 	pdfr_encoder_end_page(enc);
-    pd_outstream_set_event_handler(stm, PDF_OUTPUT_BEFORE_XREF, pdfr_write_trailer_sig, NULL);
-	pd_write_endofdocument(stm, enc->xref, enc->catalog, enc->info);
-	pd_xref_free(enc->xref); enc->xref = NULL;
-	pd_atom_table_free(enc->atoms); enc->atoms = NULL;
+	// remember to write our PDF/raster signature marker
+	// at the end of the trailer dict:
+	__pd_dict_set_pre_close(enc->trailer, pdfr_write_sig);
+	pd_write_endofdocument(stm, enc->xref, enc->catalog, enc->info, enc->trailer);
+
+	// Note: we leave all the final data structures intact in case the client
+	// has questions, like 'how many pages did we write?' or 'how big was the output file?'.
 }
 
 void pdfr_encoder_destroy(t_pdfrasencoder* enc)
 {
 	if (enc) {
+		// free everything in the pool associated
+		// with this encoder. Including the pool
+		// and the encoder struct.
 		struct t_pdmempool *pool = enc->pool;
 		pd_alloc_free_pool(pool);
 	}

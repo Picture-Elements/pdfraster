@@ -6,12 +6,16 @@
 #include "PdfXrefTable.h"
 #include "PdfStandardAtoms.h"
 
+// pseudo-inherits from hash table
 typedef struct t_pddict
 {
 	t_pdhashatomtovalue *elems;
 	pdbool isStream;
+	// handler to be called just before writing final '>>'
+	f_dict_pre_close_handler preCloseHandler;
 } t_pddict;
 
+// pseudo-inherits from t_pddict
 typedef struct t_pdstream
 {
 	t_pddict dict; /* must be first */
@@ -40,7 +44,6 @@ t_pdvalue pd_dict_new(t_pdmempool *allocsys, pdint32 initialsize)
 		pd_hashatomtovalue_free(hash);
 	}
 	return pdnullvalue();
-
 }
 
 extern void pd_dict_free(t_pdvalue dict)
@@ -116,12 +119,27 @@ int __pd_dict_capacity(t_pdvalue dict)
 	return __pd_hashatomtovalue_capacity(dict.value.dictvalue->elems);
 }
 
-
 void pd_dict_foreach(t_pdvalue dict, f_pdhashatomtovalue_iterator iter, void *cookie)
 {
 	DEREFERENCE(dict);
 	if (!IS_DICT(dict) || !dict.value.dictvalue) return;
 	pd_hashatomtovalue_foreach(dict.value.dictvalue->elems, iter, cookie);
+}
+
+void __pd_dict_set_pre_close(t_pdvalue dict, f_dict_pre_close_handler handler)
+{
+	DEREFERENCE(dict);
+	if (!IS_DICT(dict) || !dict.value.dictvalue) return;
+	dict.value.dictvalue->preCloseHandler = handler;
+}
+
+void __pd_dict_pre_close(t_pdvalue dict, t_pdoutstream *os)
+{
+	DEREFERENCE(dict);
+	if (!IS_DICT(dict) || !dict.value.dictvalue) return;
+	if (dict.value.dictvalue->preCloseHandler) {
+		dict.value.dictvalue->preCloseHandler(dict, os);
+	}
 }
 
 ///////////////////////////////////////////////////////////////////////

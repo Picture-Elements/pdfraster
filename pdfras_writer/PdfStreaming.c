@@ -297,6 +297,9 @@ static void writedict(t_pdoutstream *os, t_pdvalue dict)
 	if (IS_DICT(dict)) {
 		pd_puts(os, "<<");
 		pd_dict_foreach(dict, itemwriter, os);
+		// do any special thing just before closing off this dictionary:
+		__pd_dict_pre_close(dict, os);
+		// close the dictionary
 		pd_puts(os, " >>");
 		// If it's also a stream, append the stream<data>endstream
 		if (pd_dict_is_stream(dict))
@@ -448,13 +451,16 @@ static pdbool freeTrailerEntry(t_pdatom atom, t_pdvalue value, void *cookie)
 	return PD_TRUE;
 }
 
-void pd_write_endofdocument(t_pdoutstream *stm, t_pdxref *xref, t_pdvalue catalog, t_pdvalue info)
+void pd_write_endofdocument(t_pdoutstream *stm, t_pdxref *xref, t_pdvalue catalog, t_pdvalue info, t_pdvalue caller_trailer)
 {
 	if (stm) {
 		// use the same storage pool as the stream:
 		t_pdmempool *pool = pd_get_pool(stm);
-		// create the trailer dictionary
-		t_pdvalue trailer = pd_trailer_new(pool, xref, catalog, info);
+		t_pdvalue trailer = caller_trailer;
+		if (IS_NULL(trailer)) {
+			// create the trailer now
+			trailer = pd_trailer_new(pool, xref, catalog, info);
+		}
 		// drop the File ID into the trailer dictionary:
 		t_pdvalue file_id = pd_generate_file_id(pool, info);
 		// finally, stuff that 'ID' entry into the trailer
@@ -480,7 +486,9 @@ void pd_write_endofdocument(t_pdoutstream *stm, t_pdxref *xref, t_pdvalue catalo
 		// free the stuff that only we know about
 		// namely the file-id array in the trailer dict
 		pd_array_destroy(&file_id);
-		// and the trailer dict itself
-		pd_dict_free(trailer);
+		// free the trailer dict, if we created it:
+		if (!pd_value_eq(trailer, caller_trailer)) {
+			pd_dict_free(trailer);
+		}
 	}
 }

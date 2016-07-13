@@ -80,6 +80,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\common\test_support.c" />
+    <ClCompile Include="pdfraster_tests.c" />
     <ClCompile Include="pdfras_writer_tests.c">
       <DisableLanguageExtensions Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</DisableLanguageExtensions>
       <DisableLanguageExtensions Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</DisableLanguageExtensions>
@@ -93,6 +94,9 @@
     <ProjectReference Include="..\pdfras_writer\pdfras_writer.vcxproj">
       <Project>{f96f701b-73f9-4bab-ba84-ceff8a112289}</Project>
     </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="pdfraster_tests.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

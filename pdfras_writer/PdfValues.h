@@ -10,8 +10,8 @@ typedef void* t_pdatom;
 /* OPTIONAL|REFERENCE|TYPE */
 
 typedef enum {
+	TPDNULL = 0,
 	TPDERRVALUE,
-	TPDNULL,
 	TPDNUMBERINT,
 	TPDNUMBERFLOAT,
 	TPDNAME,
@@ -39,6 +39,7 @@ typedef struct {
 	t_pdtype pdtype;
 	u_pdvalue value;
 } t_pdvalue;
+// Note: an all-zero t_pdvalue is a null
 
 typedef struct t_pdarray t_pdarray;
 typedef struct t_pdstring t_pdstring;

@@ -15,7 +15,10 @@ extern "C" {
 // Version of the file format we support (or at least, write)
 #define PDFRASTER_SPEC_VERSION "1.0"
 
-#define PDFRAS_LIBRARY_VERSION "0.12"
+#define PDFRAS_LIBRARY_VERSION "0.13"
+// 0.13	spike	2016.07.13	moved signature to end of trailer dict
+//							introduced first high-level PdfRaster tests.
+//							fixed several bugs, one breaking change to low-level API.
 // 0.12 spike   2016.05.24  moved signature to before xref table
 // 0.11 spike   2016.05.18  correctly output PDF/raster signature in trailer
 // 0.10	spike	2016.03.11	new: pd_format_xmp_time, renamed pd_get_time_string => pd_format_time
@@ -53,11 +56,16 @@ typedef struct t_pdfrasencoder t_pdfrasencoder;
 // (You can use PDFRAS_API_LEVEL)
 // os points to a structure containing various functions and
 // handles provided by the caller to the raster encoder.
-// The following properties are set to their default values:
+// The 'os' object provides memory management and output functions.
+// The encoder allocates a memory pool to hold all the memory it needs,
+// which is released when the encoder is destroyed.
+//
+// The following encoder properties are set to their default values:
 // pixelformat		PDFRAS_BITONAL
 // compression		PDFRAS_UNCOMPRESSED
 // xdpi, ydpi		300
 // rotation			0
+//
 t_pdfrasencoder* pdfr_encoder_create(int apiLevel, t_OS *os);
 
 // Set various document metadata, traditionally stored in the DID (Document
@@ -140,8 +148,15 @@ int pdfr_encoder_get_page_height(t_pdfrasencoder* enc);
 // After this call succeeds, no page is open.
 int pdfr_encoder_end_page(t_pdfrasencoder* enc);
 
+// Returns the number of pages written to this document,
+// including the current page if one is open.
+int pdfr_encoder_page_count(t_pdfrasencoder* enc);
+
 // End the current PDF, finish writing all data to the output.
 void pdfr_encoder_end_document(t_pdfrasencoder* enc);
+
+// Returns the number of bytes written to the document
+long pdfr_encoder_bytes_written(t_pdfrasencoder* enc);
 
 // Destroy a raster PDF encoder, releasing all associated resources.
 // Do not use the enc pointer after this, it is invalid.

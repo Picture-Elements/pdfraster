@@ -92,7 +92,9 @@ int pd_value_eq(t_pdvalue a, t_pdvalue b)
 			return pd_string_equal(a.value.stringvalue, b.value.stringvalue);
 		}
 	}
-	return 1;
+	// different types are presumed not-eq
+	// so for example int(0) != float(0.0)
+	return 0;
 }
 
 void pd_value_free(t_pdvalue *v)

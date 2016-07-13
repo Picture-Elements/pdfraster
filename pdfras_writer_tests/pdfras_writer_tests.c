@@ -1,4 +1,4 @@
-// pdfras_writer_tests.cpp : automatic tests for pdfras_writer library
+// pdfras_writer_tests.c : pdfras_writer library tests
 //
 #include <stdio.h>
 #include <stdlib.h>
@@ -21,6 +21,9 @@
 #include "PdfStandardAtoms.h"
 #include "PdfStandardObjects.h"
 
+// auxiliary module with high-level (PDF/raster-specific) tests
+#include "pdfraster_tests.h"
+
 ///////////////////////////////////////////////////////////////////////
 // Constants
 
@@ -40,10 +43,10 @@ typedef struct {
 // Globals
 
 // platform functions
-t_OS os;
+static t_OS os;
 // memory buffer to capture output streams
-char output[1024];
-membuf buffer = {
+static char output[1024];
+static membuf buffer = {
 	.buffer = (pduint8*)output,
 	.bufsize = sizeof output,
 	.pos = 0
@@ -1716,7 +1719,7 @@ void test_file_structure()
 
 	// Test pd_write_endofdocument
 	buffer.pos = 0;
-	pd_write_endofdocument(out, NULL, pdnullvalue(), pdnullvalue());
+	pd_write_endofdocument(out, NULL, pdnullvalue(), pdnullvalue(), pdnullvalue());
 	ASSERT(0 == strcmp(output, "trailer\n<< /Size 0 /Root null /Info null /ID [ <D41D8CD98F00B204E9800998ECF8427E> <D41D8CD98F00B204E9800998ECF8427E> ] >>\nstartxref\n15\n%%EOF\n"));
 
 	// construct minimal versions of everything pd_write_endofdocument wants.
@@ -1728,8 +1731,8 @@ void test_file_structure()
 	// write out a 'classic' PDF header
 	pd_write_pdf_header(out, "1.6");
 	// then write out all the ending stuff.
-	pd_write_endofdocument(out, xref, catalog, DID);
-	ASSERT(0 == pd_strcmp(output,
+	pd_write_endofdocument(out, xref, catalog, DID, pdnullvalue());
+	ASSERT(0 == strcmp(output,
 "%PDF-1.6\n"
 "%\xE2\xE3\xCF\xD3\n"
 "xref\n"
@@ -1790,6 +1793,9 @@ int main(int argc, char** argv)
 	test_xref_tables();
 
 	test_file_structure();
+
+	// finally, high-level pdfraster.h tests
+	pdfraster_output_tests();
 
 	unsigned fails = get_number_of_failures();
 

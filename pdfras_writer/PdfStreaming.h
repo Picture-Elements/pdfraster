@@ -91,7 +91,11 @@ extern void pd_write_reference_declaration(t_pdoutstream *stm, t_pdvalue ref);
 extern void pd_write_pdf_header(t_pdoutstream *stm, char *version);
 
 // Write all the stuff that goes at the end of a PDF, to a stream.
-extern void pd_write_endofdocument(t_pdoutstream *stm, t_pdxref *xref, t_pdvalue catalog, t_pdvalue info);
+extern void pd_write_endofdocument(t_pdoutstream *stm,
+	t_pdxref *xref,
+	t_pdvalue catalog,
+	t_pdvalue info,
+	t_pdvalue trailer);
 
 // attach an event handler to an output event on a PDF output stream.
 // setting a NULL handler is valid and means 'no event handler'.

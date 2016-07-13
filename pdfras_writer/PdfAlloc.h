@@ -18,7 +18,7 @@ extern void pd_free(void *ptr);
 // Return the number of blocks currently allocated from a pool
 extern size_t pd_get_block_count(t_pdmempool* pool);
 
-// Return the total bytes currently allocated to blocks a pool.
+// Return the total bytes currently allocated to blocks in a pool.
 // Does not include any overhead, just the sum of the sizes alloc'd and not yet freed.
 extern size_t pd_get_bytes_in_use(t_pdmempool* pool);
 
