@@ -21,18 +21,13 @@ static void file_closer(void* source)
     }
 }
 
-
 // Return TRUE if the file 'claims to be' a PDF/raster file.
 // FALSE otherwise.
 int pdfrasread_recognize_file(FILE* f)
 {
     int bYes = FALSE;
     if (f) {
-        t_pdfrasreader* reader = pdfrasread_create(PDFRAS_API_LEVEL, &file_reader, NULL);
-        if (reader) {
-            bYes = pdfrasread_recognize(reader, f);
-            pdfrasread_destroy(reader);
-        }
+		bYes = pdfrasread_recognize_source(file_reader, f);
     }
     return bYes;
 }

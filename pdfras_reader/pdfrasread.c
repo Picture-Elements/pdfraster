@@ -47,9 +47,9 @@ typedef struct t_pdfrasreader {
 // Utility Functions
 
 // Find last occurrence of string in string
-static char * strrstr(char * haystack, const char * needle)
+static const char * strrstr(const char * haystack, const char * needle)
 {
-	char *temp = haystack, *before = NULL;
+	const char *temp = haystack, *before = NULL;
 	while ((temp = strstr(temp, needle))) before = temp++;
 	return before;
 }
@@ -88,6 +88,117 @@ static int seek_to(t_pdfrasreader* reader, pduint32 off)
 	assert(off >= reader->buffer.off);
 	assert(off < reader->buffer.off + reader->buffer.len);
 	return TRUE;
+}
+
+// Utility functions, do not require a reader object
+//
+
+static pduint32 pdfras_find_file_size(pdfras_freader readfn, void* source)
+{
+	pduint32 off = 0x00000000, step = 0x800000;
+	pduint32 len = 0;
+	// find offset to EOF by binary search
+	while (step > 0) {
+		char tail[2];
+		switch (readfn(source, off + step, 2, tail)) {
+		case 1:
+			len = off + step + 1;
+			step = 0;
+			break;
+		case 0:
+			step = (step + 1) / 2;
+			break;
+		case 2:
+			off += step;
+			break;
+		} // switch
+	}
+	return len;
+} // pdfras_find_file_size
+
+  // read the last len bytes, or as many as there are, from the reader->source.
+  // Append a trailing NUL (so tail buffer's capacity must be at least len+1)
+  // Returns the actual number of bytes read into the tail buffer.
+static size_t pdfras_read_tail(pdfras_freader readfn, void* source, char* tail, size_t len)
+{
+	pduint32 off = pdfras_find_file_size(readfn, source);
+	off = (off < len) ? 0 : off - len;
+	size_t step = readfn(source, off, len, tail);
+	// make sure it's NUL-terminated but remember it could contain embedded NULs.
+	tail[step] = 0;
+	return step;
+}
+
+int pdfras_recognize_pdrf_tail(const char* tail)
+{
+	const char* p = strrstr(tail, "%PDF-raster-");
+	if (!p) {
+		return FALSE;
+	}
+	if (p == tail) {
+		return FALSE;
+	}
+	if (p[-1] != 0x0D && p[-1] != 0x0A) {
+		return FALSE;
+	}
+	p += 12;
+	if (!isdigit(*p)) return FALSE;
+	while (isdigit(*p)) p++;
+	if (*p != '.') return FALSE;
+	p++;
+	if (!isdigit(*p)) return FALSE;
+	while (isdigit(*p)) p++;
+	if (*p == 0x0D) {
+		p++;
+		if (*p == 0x0A) p++;
+	}
+	else if (*p == 0x0A) {
+		p++;
+	}
+	else {
+		return FALSE;
+	}
+	return TRUE;
+}
+
+int pdfras_recognize_pdf_header(const void* sig)
+{
+	if (!sig) {
+		return FALSE;
+	}
+	const char* p = (const char*)sig;
+	if (0 != strncmp(p, "%PDF-1.", 7)) {
+		return FALSE;
+	}
+	p += 7;
+	if (!isdigit(*p)) return FALSE;
+	while (isdigit(*p)) p++;
+	if (*p == 0x0D) {
+		p++;
+		if (*p == 0x0A) p++;
+	}
+	else if (*p == 0x0A) {
+		p++;
+	}
+	else {
+		return FALSE;
+	}
+	return TRUE;
+}
+
+int pdfrasread_recognize_source(pdfras_freader readfn, void* source)
+{
+	char buffer[1024];
+	// check the header, it's quick & easy and we do need
+	// to know that it's some kind of PDF, not just any file
+	if (readfn(source, 0, 32, buffer) != 32) {
+		return FALSE;
+	}
+	if (!pdfras_recognize_pdf_header(buffer)) {
+		return FALSE;
+	}
+	pdfras_read_tail(readfn, source, buffer, sizeof buffer - 1);
+	return pdfras_recognize_pdrf_tail(buffer);
 }
 
 ///////////////////////////////////////////////////////////////////////
@@ -970,28 +1081,14 @@ static int build_page_table(t_pdfrasreader* reader, pduint32 root)
 // Return TRUE if all OK, FALSE if some problem.
 static int parse_trailer(t_pdfrasreader* reader)
 {
-	char tail[1024+1];
-	pduint32 off = 0x00000000, step = 0x800000;
-	pduint32 len = 0;
-	while (step > 0) {
-		switch (reader->fread(reader->source, off+step, 2, tail)) {
-		case 1:
-			len = off + step + 1;
-			step = 0;
-			break;
-		case 0:
-			step = (step+1)/2;
-			break;
-		case 2:
-			off += step;
-			break;
-		} // switch
+	reader->filesize = pdfras_find_file_size(reader->fread, reader->source);
+	char tail[512+1];
+	size_t tailsize = pdfras_read_tail(reader->fread, reader->source, tail, sizeof tail - 1);
+	if (!pdfras_recognize_pdrf_tail(tail)) {
+		// it doesn't have the PDF-raster marker
+		return FALSE;
 	}
-	reader->filesize = len;
-	off = (len < 32) ? 0 : len - 32;
-	step = reader->fread(reader->source, off, 32, tail);
-	// make sure it's NUL-terminated but remember it could contain embedded NULs.
-	tail[step] = 0;
+	pduint32 off = reader->filesize - tailsize;
 	const char* eof = strrstr(tail, "%%EOF");
 	if (!eof) {
 		// invalid PDF - %%EOF not found in last 1024 bytes.
@@ -1010,7 +1107,7 @@ static int parse_trailer(t_pdfrasreader* reader)
 		// startxref not followed by unsigned int
 		return FALSE;
 	}
-	if (xref_off < 16 || xref_off >= len) {
+	if (xref_off < 16 || xref_off >= reader->filesize) {
 		// invalid PDF - offset to xref table is bogus
 		return FALSE;
 	}
@@ -1066,8 +1163,13 @@ static int parse_trailer(t_pdfrasreader* reader)
 // -1 in case of error.
 int pdfrasread_page_count(t_pdfrasreader* reader)
 {
+	if (!reader) {
+		return -1;
+	}
 	if (!reader->xrefs) {
-		parse_trailer(reader);
+		if (!parse_trailer(reader)) {
+			return -1;
+		}
 	}
 	return reader->page_count;
 }
@@ -1150,8 +1252,9 @@ static int decode_strip_format(t_pdfrasreader* reader, pduint32* poff, unsigned 
 
 static int get_page_info(t_pdfrasreader* reader, int p, t_pdfpageinfo* pinfo)
 {
-	assert(reader);
-	assert(pinfo);
+	if (!reader || !pinfo) {
+		return FALSE;
+	}
 	// clear info to all 0's
 	memset(pinfo, 0, sizeof *pinfo);
 	// If we haven't 'opened' the file, do the initial stuff now
@@ -1414,53 +1517,6 @@ size_t pdfrasread_read_raw_strip(t_pdfrasreader* reader, int p, int s, void* buf
 	return length;
 }
 
-// Utility functions, do not require a reader object
-//
-int pdfras_recognize_signature(const void* sig)
-{
-	if (!sig) {
-		return FALSE;
-	}
-	const char* p = (const char*)sig;
-	if (0 != strncmp(p, "%PDF-1.", 7)) {
-		return FALSE;
-	}
-	p += 7;
-	if (!isdigit(*p)) return FALSE;
-	while (isdigit(*p)) p++;
-	if (*p == 0x0D) {
-		p++;
-		if (*p == 0x0A) p++;
-	}
-	else if (*p == 0x0A) {
-		p++;
-	}
-	else {
-		return FALSE;
-	}
-	if (0 != strncmp(p, "%\xAE\xE2\x9A\x86" "er-", 8)) {
-		return FALSE;
-	}
-	p += 8;
-	if (!isdigit(*p)) return FALSE;
-	while (isdigit(*p)) p++;
-	if (*p != '.') return FALSE;
-	p++;
-	if (!isdigit(*p)) return FALSE;
-	while (isdigit(*p)) p++;
-	if (*p == 0x0D) {
-		p++;
-		if (*p == 0x0A) p++;
-	}
-	else if (*p == 0x0A) {
-		p++;
-	}
-	else {
-		return FALSE;
-	}
-	return TRUE;
-}
-
 ///////////////////////////////////////////////////////////////////////
 // Top-Level Public Functions
 
@@ -1519,15 +1575,6 @@ int pdfrasread_open(t_pdfrasreader* reader, void* source)
 	return reader->bOpen;
 }
 
-int pdfrasread_recognize(t_pdfrasreader* reader, void* source)
-{
-    int bYes = FALSE;
-    pdfrasread_close(reader);
-    bYes = pdfrasread_open(reader, source);
-    pdfrasread_close(reader);
-    return bYes;
-}
-
 void* pdfrasread_source(t_pdfrasreader* reader)
 {
 	if (reader) {
@@ -1535,7 +1582,6 @@ void* pdfrasread_source(t_pdfrasreader* reader)
 	}
 	return NULL;
 }
-
 
 int pdfrasread_is_open(t_pdfrasreader* reader)
 {

@@ -1,6 +1,5 @@
 #ifndef _H_pdfrasread
 #define _H_pdfrasread
-#pragma once
 // This API provides an interface for reading byte streams
 // that follow the PDF/raster format.
 // It does not use or depend on files, or depend on any
@@ -19,7 +18,8 @@ extern "C" {
 
 #define PDFRAS_API_LEVEL	1
 
-#define PDFRASREAD_VERSION "0.1"
+#define PDFRASREAD_VERSION "0.2"
+// 0.2	spike	2016.07.13	revised PDF-raster marker in trailer dict.
 // 0.1	spike	2015.02.11	1st version
 
 // Pixel Formats
@@ -64,13 +64,10 @@ void pdfrasread_destroy(t_pdfrasreader* reader);
 // and passed to the readfn and closefn of the reader.
 int pdfrasread_open(t_pdfrasreader* reader, void* source);
 
-// Check if a source 'claims to be' or is marked as, a PDF/raster stream.
-// Returns TRUE if there are no errors and the source is marked as PDF/raster.
+// Check if a source is marked as a PDF/raster PDF stream.
+// Returns TRUE if a quick header & trailer check passes.
 // Returns FALSE otherwise.
-// If the reader is open it will be closed immediately by this function.
-// On return the reader will be in a closed state.
-// The source may or may not be temporarily opened on this reader during this function.
-int pdfrasread_recognize(t_pdfrasreader* reader, void* source);
+int pdfrasread_recognize_source(pdfras_freader fread, void* source);
 
 // Return TRUE if reader has a PDF/raster stream open,
 // return FALSE otherwise.
