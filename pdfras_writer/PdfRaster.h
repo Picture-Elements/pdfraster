@@ -1,6 +1,5 @@
 #ifndef _H_PdfRaster
 #define _H_PdfRaster
-#pragma once
 
 #ifdef __cplusplus
 extern "C" {
@@ -51,7 +50,7 @@ typedef enum {
 typedef struct t_pdfrasencoder t_pdfrasencoder;
 
 // create and return a raster PDF encoder, reading to begin
-// encoding one PDF/raster output stream.
+// encoding a PDF/raster output stream.
 // apiLevel is the version of this API that the caller is expecting.
 // (You can use PDFRAS_API_LEVEL)
 // os points to a structure containing various functions and
