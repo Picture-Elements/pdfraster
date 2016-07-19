@@ -1015,7 +1015,7 @@ void test_atoms()
 	int stripno;
 	for (stripno = 0; stripno < 1000; stripno++) {
 		char stripName[20];
-		sprintf_s(stripName, 20, "Strip%d", stripno);
+		sprintf_s(stripName, 20, "strip%d", stripno);
 		t_pdatom strip = pd_atom_intern(atoms, stripName);
 		ASSERT(strip);
 		ASSERT(pd_strcmp(pd_atom_name(strip), stripName) == 0);
@@ -1048,7 +1048,7 @@ static void generate_content(t_pdcontents_gen *gen, void *cookie)
 	int n;
 	// generate simulated page content
 	for (n = 0; n < strips; n++) {
-		char stripNname[12] = "Strip";
+		char stripNname[12] = "strip";
 		pd_strcpy(stripNname + 5, ELEMENTS(stripNname) - 5, pditoa(n));
 		t_pdatom stripNatom = pd_atom_intern(atoms, stripNname);
 		pd_gen_gsave(gen);

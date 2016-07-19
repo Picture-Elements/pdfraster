@@ -300,7 +300,7 @@ t_pdvalue pdfr_encoder_get_colorspace(t_pdfrasencoder* enc)
 int pdfr_encoder_write_strip(t_pdfrasencoder* enc, int rows, const pduint8 *buf, size_t len)
 {
 	t_pdvalue colorspace = pdfr_encoder_get_colorspace(enc);
-	char stripname[12] = "Strip";
+	char stripname[12] = "strip";
 
 	e_ImageCompression comp;
 	switch (enc->compression) {
@@ -373,7 +373,7 @@ static void content_generator(t_pdcontents_gen *gen, void *cookie)
 	t_pdvalue res = pd_dict_get(enc->currentPage, PDA_Resources, &succ);
 	t_pdvalue xobj = pd_dict_get(res, PDA_XObject, &succ);
 	for (int n = 0; n < enc->strips; n++) {
-		char stripNname[12] = "Strip";
+		char stripNname[12] = "strip";
 		pd_strcpy(stripNname + 5, ELEMENTS(stripNname) - 5, pditoa(n));
 		// turn strip name into an atom
 		t_pdatom stripNatom = pd_atom_intern(enc->atoms, stripNname);
