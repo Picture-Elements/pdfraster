@@ -33,9 +33,9 @@ extern "C" {
 
 // Pixel Formats
 typedef enum {
-	PDFRAS_BITONAL,				// 1-bit per pixel, 0=black
-	PDFRAS_GRAY8,				// 8-bit per pixel, 0=black, calibrated or DeviceGray
-	PDFRAS_GRAY16,				// 16-bit per pixel, 0=black calibrated or DeviceGray
+	PDFRAS_BITONAL,				// 1-bit per pixel, 0=black (DeviceGray or CalGray)
+	PDFRAS_GRAY8,				// 8-bit per pixel, 0=black (CalGray)
+	PDFRAS_GRAY16,				// 16-bit per pixel, 0=black (CalGray)
 	PDFRAS_RGB24,				// 24-bit per pixel, sRGB or DeviceRGB
 	PDFRAS_RGB48,				// 48-bit per pixel, sRGB or DeviceRGB
 } RasterPixelFormat;

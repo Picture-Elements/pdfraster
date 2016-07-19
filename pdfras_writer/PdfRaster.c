@@ -280,16 +280,17 @@ t_pdvalue pdfr_encoder_get_colorspace(t_pdfrasencoder* enc)
 		else {
 			return pdfr_encoder_get_srgb_colorspace(enc);
 		}
-	case PDFRAS_GRAY8:
-	case PDFRAS_GRAY16:
 	case PDFRAS_BITONAL:
-		// unless told to use device grayscale, use calibrated grayscale
+		// "Bitonal images shall be represented by an image XObject dictionary with DeviceGray
+		// or CalGray as the value of its ColorSpace entry..."
 		if (enc->devColor) {
 			return pdatomvalue(PDA_DeviceGray);
 		}
-		else {
-			return pdfr_encoder_get_calgray_colorspace(enc);
-		}
+	case PDFRAS_GRAY8:
+	case PDFRAS_GRAY16:
+		// "Grayscale images shall be represented by an image XObject dictionary with CalGray
+		// as the value of its ColorSpace entry..."
+		return pdfr_encoder_get_calgray_colorspace(enc);
 	default:
 		break;
 	} // switch
