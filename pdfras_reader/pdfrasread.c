@@ -19,6 +19,22 @@ typedef struct t_xref_entry {
 	char		eol[2];
 } t_xref_entry;
 
+// All the information about a single page and the image it contains
+typedef struct {
+	pduint32			off;				// offset of page object in file
+	unsigned long		BitsPerComponent;
+	double				MediaBox[4];
+	RasterPixelFormat	format;
+	double				whitePoint[3];
+	double				blackPoint[3];
+	unsigned long		width;
+	unsigned long		height;
+	unsigned long		rotation;
+	double				xdpi, ydpi;
+	int					strip_count;		// number of strips in this page
+	size_t				max_strip_size;		// largest (raw) strip size
+} t_pdfpageinfo;
+
 // Structure that represents a PDF/raster byte-stream that is open for reading
 typedef struct t_pdfrasreader {
 	int					apiLevel;			// caller's specified API level.
@@ -765,6 +781,82 @@ static int parse_array(t_pdfrasreader* reader, pduint32 *poff)
 	return TRUE;
 }
 
+static int parse_color_space(t_pdfrasreader* reader, pduint32 *poff, unsigned long stripno, t_pdfpageinfo *info)
+{
+	// TODO: If stripno == 0, colorspace info should be undefined, ...
+	// If stripno != 0, colorspace info must match what's already set in info
+	if (token_match(reader, poff, "/DeviceGray")) {
+		switch (info->BitsPerComponent) {
+		case 1:
+			info->format = RASREAD_BITONAL;
+			break;
+		case 8:
+			info->format = RASREAD_GRAY8;
+			break;
+		case 16:
+			info->format = RASREAD_GRAY16;
+			break;
+		default:
+			// PDF/raster: /DeviceGray image must be 1, 8 or 16 BitsPerComponent
+			return FALSE;
+		}
+	}
+	else if (token_match(reader, poff, "/DeviceRGB")) {
+		switch (info->BitsPerComponent) {
+		case 8:
+			info->format = RASREAD_RGB24;
+			break;
+		case 16:
+			info->format = RASREAD_RGB48;
+			break;
+		default:
+			// PDF/raster: /DeviceRGB image must be 8 or 16 BitsPerComponent
+			return FALSE;
+		}
+	}
+	else if (token_match(reader, poff, "[")) {
+		if (token_match(reader, poff, "/CalGray")) {
+			// calibrated grayscale
+			switch (info->BitsPerComponent) {
+			case 1:
+				info->format = RASREAD_BITONAL;
+				break;
+			case 8:
+				info->format = RASREAD_GRAY8;
+				break;
+			case 16:
+				info->format = RASREAD_GRAY16;
+				break;
+			default:
+				// PDF/raster: /DeviceGray image must be 1, 8 or 16 BitsPerComponent
+				return FALSE;
+			}
+		}
+		else if (token_match(reader, poff, "/ICCBased")) {
+			switch (info->BitsPerComponent) {
+			case 8:
+				info->format = RASREAD_RGB24;
+				break;
+			case 16:
+				info->format = RASREAD_RGB48;
+				break;
+			default:
+				// PDF/raster: /ICCBased image must be 8 or 16 BitsPerComponent
+				return FALSE;
+			}
+		}
+		else {
+			// missing or unrecognized colorspace type
+			return FALSE;
+		}
+	}
+	else {
+		// PDF/raster: ColorSpace must be /DeviceGray or /DeviceRGB
+		return FALSE;
+	}
+	return TRUE;
+}
+
 static int parse_media_box(t_pdfrasreader* reader, pduint32 *poff, double mediabox[4])
 {
 	skip_whitespace(reader, poff);
@@ -1185,19 +1277,6 @@ static pduint32 get_page_pos(t_pdfrasreader* reader, int n)
 	return reader->page_table[n];
 }
 
-typedef struct {
-	pduint32			off;				// offset of page object in file
-	unsigned long		BitsPerComponent;
-	double				MediaBox[4];
-	RasterPixelFormat	format;
-	unsigned long		width;
-	unsigned long		height;
-	unsigned long		rotation;
-	double				xdpi, ydpi;
-	int					strip_count;		// number of strips in this page
-	size_t				max_strip_size;		// largest (raw) strip size
-} t_pdfpageinfo;
-
 // round a dpi value to an exact integer, if it's already 'really close'
 static double tweak_dpi(double dpi)
 {
@@ -1214,39 +1293,6 @@ static double tweak_dpi(double dpi)
 
 static int decode_strip_format(t_pdfrasreader* reader, pduint32* poff, unsigned long bpc, RasterPixelFormat* pformat)
 {
-	if (token_match(reader, poff, "/DeviceGray")) {
-		switch (bpc) {
-		case 1:
-			*pformat = RASREAD_BITONAL;
-			break;
-		case 8:
-			*pformat = RASREAD_GRAY8;
-			break;
-		case 16:
-			*pformat = RASREAD_GRAY16;
-			break;
-		default:
-			// PDF/raster: /DeviceGray image must be 1, 8 or 16 BitsPerComponent
-			return FALSE;
-		}
-	}
-	else if (token_match(reader, poff, "/DeviceRGB")) {
-		switch (bpc) {
-		case 8:
-			*pformat = RASREAD_RGB24;
-			break;
-		case 16:
-			*pformat = RASREAD_RGB48;
-			break;
-		default:
-			// PDF/raster: /DeviceRGB image must be 8 or 16 BitsPerComponent
-			return FALSE;
-		}
-	}
-	else {
-		// PDF/raster: ColorSpace must be /DeviceGray or /DeviceRGB
-		return FALSE;
-	}
 	return TRUE;
 }
 
@@ -1352,17 +1398,9 @@ static int get_page_info(t_pdfrasreader* reader, int p, t_pdfpageinfo* pinfo)
 			// PDF/raster: image object, each strip must have a named ColorSpace
 			return FALSE;
 		}
-		RasterPixelFormat strip_format;
-		if (!decode_strip_format(reader, &val, pinfo->BitsPerComponent, &strip_format)) {
+		if (!parse_color_space(reader, &val, stripno, pinfo)) {
 			// PDF/raster: invalid color space in strip
 			return FALSE;
-		}
-		if (stripno == 0) {
-			pinfo->format = strip_format;
-		}
-		else {
-			// all strips on a page must have the same pixel format
-			assert(pinfo->format == strip_format);
 		}
 		// max_strip_size is (surprise) the maximum of the strip sizes (in bytes)
 		long strip_size;

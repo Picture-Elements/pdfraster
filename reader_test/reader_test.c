@@ -77,7 +77,7 @@ void page_count_tests()
 void page_info_tests()
 {
 	printf("--page info--\n");
-	t_pdfrasreader* reader = pdfrasread_open_filename(RASREAD_API_LEVEL, "valid1.pdf");
+	t_pdfrasreader* reader = pdfrasread_open_filename(RASREAD_API_LEVEL, "sample all formats.pdf");
 	// that should be successful:
 	ASSERT(reader != NULL);
 	// After successful open, this must be TRUE:
@@ -85,10 +85,10 @@ void page_info_tests()
 	// don't know what source is exactly, but assuming it's a FILE*
 	// it shouldn't be NULL:
 	ASSERT(pdfrasread_source(reader) != NULL);
-	// that file has 6 pages:
-	ASSERT(6 == pdfrasread_page_count(reader));
+	// that file has 1 page:
+	ASSERT(7 == pdfrasread_page_count(reader));
 
-	ASSERT(RASREAD_GRAY8 == pdfrasread_page_format(reader, 0));
+	ASSERT(RASREAD_BITONAL == pdfrasread_page_format(reader, 0));
 	ASSERT(8 == pdfrasread_page_width(reader, 0));
 	ASSERT(11 == pdfrasread_page_height(reader, 0));
 	ASSERT(0 == pdfrasread_page_rotation(reader, 0));
