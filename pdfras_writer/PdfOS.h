@@ -16,7 +16,7 @@ typedef enum {
 	REPORTING_API,			// an invalid request was made to this API.
 	REPORTING_MEMORY,		// memory allocation failed.
 	REPORTING_IO,			// PDF read or write failed unexpectedly.
-	REPORTING_LIMIT,		// a built-in limitation of this library was reached.
+	REPORTING_LIMIT,		// a built-in limitation of this library was exceeded.
 	REPORTING_INTERNAL,		// an 'impossible' internal state has been detected.
 	REPORTING_FATAL			// none of the above, and the current API call cannot complete.
 } ReportingLevel;

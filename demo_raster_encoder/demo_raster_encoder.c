@@ -149,6 +149,30 @@ void generate_image_data()
 	}
 } // generate_image_data
 
+int write_0page_file(t_OS os, const char *filename)
+
+{
+	FILE *fp = fopen(filename, "wb");
+	if (fp == 0) {
+		fprintf(stderr, "unable to open %s for writing\n", filename);
+		return 1;
+	}
+	os.writeoutcookie = fp;
+	os.allocsys = pd_alloc_new_pool(&os);
+
+	// Construct a raster PDF encoder
+	t_pdfrasencoder* enc = pdfr_encoder_create(PDFRAS_API_LEVEL, &os);
+	pdfr_encoder_set_creator(enc, "raster_encoder_demo 1.0");
+	pdfr_encoder_set_subject(enc, "0-page sample output");
+
+	// the document is complete
+	pdfr_encoder_end_document(enc);
+	// clean up
+	fclose(fp);
+	pdfr_encoder_destroy(enc);
+	return 0;
+}
+
 // write 8.5 x 11 bitonal page 100 DPI with a light dotted grid
 void write_bitonal_uncomp_page(t_pdfrasencoder* enc)
 {
@@ -583,6 +607,8 @@ int main(int argc, char** argv)
 	os.writeout = myOutputWriter;
 
 	generate_image_data();
+
+	write_0page_file(os, "sample empty.pdf");
 
 	write_bitonal_uncompressed_file(os, "sample bw1 uncompressed.pdf");
 

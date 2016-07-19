@@ -1217,13 +1217,13 @@ static int decode_strip_format(t_pdfrasreader* reader, pduint32* poff, unsigned 
 	if (token_match(reader, poff, "/DeviceGray")) {
 		switch (bpc) {
 		case 1:
-			*pformat = PDFRAS_BITONAL;
+			*pformat = RASREAD_BITONAL;
 			break;
 		case 8:
-			*pformat = PDFRAS_GRAY8;
+			*pformat = RASREAD_GRAY8;
 			break;
 		case 16:
-			*pformat = PDFRAS_GRAY16;
+			*pformat = RASREAD_GRAY16;
 			break;
 		default:
 			// PDF/raster: /DeviceGray image must be 1, 8 or 16 BitsPerComponent
@@ -1233,10 +1233,10 @@ static int decode_strip_format(t_pdfrasreader* reader, pduint32* poff, unsigned 
 	else if (token_match(reader, poff, "/DeviceRGB")) {
 		switch (bpc) {
 		case 8:
-			*pformat = PDFRAS_RGB24;
+			*pformat = RASREAD_RGB24;
 			break;
 		case 16:
-			*pformat = PDFRAS_RGB48;
+			*pformat = RASREAD_RGB48;
 			break;
 		default:
 			// PDF/raster: /DeviceRGB image must be 8 or 16 BitsPerComponent
@@ -1385,7 +1385,7 @@ RasterPixelFormat pdfrasread_page_format(t_pdfrasreader* reader, int n)
 {
 	t_pdfpageinfo info;
 	if (!get_page_info(reader, n, &info)) {
-		return PDFRAS_FORMAT_NULL;
+		return RASREAD_FORMAT_NULL;
 	}
 	return info.format;
 }
@@ -1527,7 +1527,7 @@ t_pdfrasreader* pdfrasread_create(int apiLevel, pdfras_freader readfn, pdfras_fc
 		// error, invalid parameter value
 		return NULL;
 	}
-	if (apiLevel > PDFRAS_API_LEVEL) {
+	if (apiLevel > RASREAD_API_LEVEL) {
 		// error, caller expects a future version of this API
 		return NULL;
 	}

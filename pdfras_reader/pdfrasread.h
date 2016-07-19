@@ -16,7 +16,7 @@ extern "C" {
 #define FALSE 0
 #endif
 
-#define PDFRAS_API_LEVEL	1
+#define RASREAD_API_LEVEL	1
 
 #define PDFRASREAD_VERSION "0.2"
 // 0.2	spike	2016.07.13	revised PDF-raster marker in trailer dict.
@@ -24,20 +24,20 @@ extern "C" {
 
 // Pixel Formats
 typedef enum {
-	PDFRAS_FORMAT_NULL,			// null value
-	PDFRAS_BITONAL,				// 1-bit per pixel, 0=black
-	PDFRAS_GRAY8,				// 8-bit per pixel, 0=black
-	PDFRAS_GRAY16,				// 16-bit per pixel, 0=black (under discussion)
-	PDFRAS_RGB24,				// 24-bit per pixel, sRGB
-	PDFRAS_RGB48,				// 48-bit per pixel, sRGB (under discussion)
+	RASREAD_FORMAT_NULL,			// null value
+	RASREAD_BITONAL,				// 1-bit per pixel, 0=black
+	RASREAD_GRAY8,				// 8-bit per pixel, 0=black
+	RASREAD_GRAY16,				// 16-bit per pixel, 0=black (under discussion)
+	RASREAD_RGB24,				// 24-bit per pixel, sRGB
+	RASREAD_RGB48,				// 48-bit per pixel, sRGB (under discussion)
 } RasterPixelFormat;
 
 // Compression Modes
 typedef enum {
-	PDFRAS_COMPRESSION_NULL,	// null value
-	PDFRAS_UNCOMPRESSED,		// uncompressed (/Filter null)
-	PDFRAS_JPEG,				// JPEG baseline (DCTDecode)
-	PDFRAS_CCITTG4,				// CCITT Group 4 (CCITTFaxDecode)
+	RASREAD_COMPRESSION_NULL,	// null value
+	RASREAD_UNCOMPRESSED,		// uncompressed (/Filter null)
+	RASREAD_JPEG,				// JPEG baseline (DCTDecode)
+	RASREAD_CCITTG4,				// CCITT Group 4 (CCITTFaxDecode)
 } RasterCompression;
 
 // function template: read length bytes at offset from source into buffer

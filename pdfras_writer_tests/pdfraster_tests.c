@@ -6,6 +6,7 @@
 
 #include "portability.h"
 #include "test_support.h"
+#include "pdfrasread.h"
 
 #include "PdfRaster.h"
 #include "PdfStandardObjects.h"
@@ -70,6 +71,19 @@ void pdfraster_minimal_file()
 	t_pdfrasencoder* enc = pdfr_encoder_create(PDFRAS_API_LEVEL, &os);
 	ASSERT(pdfr_encoder_page_count(enc) == 0);
 	pdfr_encoder_end_document(enc);
+
+	// validate the output in various ways
+	ASSERT(strlen(output) > 128);
+	ASSERT(strlen(output) < 1024);
+	unsigned mv;
+	unsigned char binsig[8];
+	ASSERT(2 == sscanf_s(output, "%%PDF-1.%u\n%%%4s\n", &mv, binsig, sizeof binsig));
+	ASSERT(mv >= 4);
+	ASSERT(mv <= 8);
+	ASSERT(binsig[0] > 127);
+	ASSERT(binsig[1] > 127);
+
+	ASSERT(0 == strcmp(output + strlen(output) - 6, "%%EOF\n"));
 
 	// check for reasonable state after end_document
 	ASSERT(pdfr_encoder_page_count(enc) == 0);

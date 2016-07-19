@@ -51,7 +51,7 @@ int pdfrasread_page_count_file(FILE* f)
 {
 	int nPages = -1;
 	// construct a PDF/raster reader based on the file
-	t_pdfrasreader* reader = pdfrasread_create(PDFRAS_API_LEVEL, &file_reader, NULL);
+	t_pdfrasreader* reader = pdfrasread_create(RASREAD_API_LEVEL, &file_reader, NULL);
 	if (reader) {
 		if (pdfrasread_open(reader, f)) {
 			// count its pages
