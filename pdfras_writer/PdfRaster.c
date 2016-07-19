@@ -263,7 +263,8 @@ t_pdvalue pdfr_encoder_get_calgray_colorspace(t_pdfrasencoder* enc)
 	double black[3] = { 0.0, 0.0, 0.0 };
 	// Should this be D65? [0.9505, 1.0000, 1.0890]?  Does it matter?
 	double white[3] = { 1.0, 1.0, 1.0 };
-	double gamma = 2.25;
+	// "The Gamma  entry shall be present in the CalGray colour space dictionary with a value of 2.2."
+	double gamma = 2.2;
 	return pd_make_calgray_colorspace(enc->pool, black, white, gamma);
 }
 
