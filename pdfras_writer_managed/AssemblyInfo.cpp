@@ -10,11 +10,11 @@ using namespace System::Security::Permissions;
 // set of attributes. Change these attribute values to modify the information
 // associated with an assembly.
 //
-[assembly:AssemblyTitleAttribute(L"class_library")];
+[assembly:AssemblyTitleAttribute(L"pdfras_writer_managed")];
 [assembly:AssemblyDescriptionAttribute(L"")];
 [assembly:AssemblyConfigurationAttribute(L"")];
 [assembly:AssemblyCompanyAttribute(L"")];
-[assembly:AssemblyProductAttribute(L"class_library")];
+[assembly:AssemblyProductAttribute(L"pdfras_writer_managed")];
 [assembly:AssemblyCopyrightAttribute(L"Copyright (c)  2016")];
 [assembly:AssemblyTrademarkAttribute(L"")];
 [assembly:AssemblyCultureAttribute(L"")];
@@ -30,7 +30,7 @@ using namespace System::Security::Permissions;
 // You can specify all the value or you can default the Revision and Build Numbers
 // by using the '*' as shown below:
 
-[assembly:AssemblyVersionAttribute("1.0.*")];
+[assembly:AssemblyVersionAttribute("0.14.*")];
 
 [assembly:ComVisible(false)];
 

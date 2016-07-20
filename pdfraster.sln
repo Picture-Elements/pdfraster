@@ -35,7 +35,7 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "pdfras_writer_tests", "pdfr
 		{F96F701B-73F9-4BAB-BA84-CEFF8A112289} = {F96F701B-73F9-4BAB-BA84-CEFF8A112289}
 	EndProjectSection
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "class_library", "class_library\class_library.vcxproj", "{943AD428-4D74-49AA-807C-36D854FA7723}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "pdfras_writer_managed", "pdfras_writer_managed\pdfras_writer_managed.vcxproj", "{943AD428-4D74-49AA-807C-36D854FA7723}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
