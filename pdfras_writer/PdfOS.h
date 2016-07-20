@@ -60,9 +60,6 @@ extern pdint32 pdstrlen(const char *s);
 // Can write up to 12 chars (counting the trailing NUL) at dst.
 extern char *pditoa(pdint32 i, char* dst);
 
-extern char *pdftoa(pddouble n);
-extern char * pdftoaprecision(pddouble n, pddouble precision);
-
 // use this macro to suppress "unreferenced formal parameter" warnings
 #define UNUSED_FORMAL(x) ((void)(x))
 
