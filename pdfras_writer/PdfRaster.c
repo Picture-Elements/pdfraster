@@ -300,7 +300,7 @@ t_pdvalue pdfr_encoder_get_colorspace(t_pdfrasencoder* enc)
 int pdfr_encoder_write_strip(t_pdfrasencoder* enc, int rows, const pduint8 *buf, size_t len)
 {
 	t_pdvalue colorspace = pdfr_encoder_get_colorspace(enc);
-	char stripname[12] = "strip";
+	char stripname[5+12] = "strip";
 
 	e_ImageCompression comp;
 	switch (enc->compression) {
@@ -337,7 +337,7 @@ int pdfr_encoder_write_strip(t_pdfrasencoder* enc, int rows, const pduint8 *buf,
 		colorspace);
 	// get a reference to this (strip) image
 	t_pdvalue imageref = pd_xref_makereference(enc->xref, image);
-	pd_strcpy(stripname + 5, ELEMENTS(stripname) - 5, pditoa(enc->strips));
+	pditoa(enc->strips, stripname + 5);
 	// turn strip name into an atom
 	t_pdatom strip = pd_atom_intern(enc->atoms, stripname);
 	// add the image to the resources of the current page, with the given name
@@ -373,8 +373,8 @@ static void content_generator(t_pdcontents_gen *gen, void *cookie)
 	t_pdvalue res = pd_dict_get(enc->currentPage, PDA_Resources, &succ);
 	t_pdvalue xobj = pd_dict_get(res, PDA_XObject, &succ);
 	for (int n = 0; n < enc->strips; n++) {
-		char stripNname[12] = "strip";
-		pd_strcpy(stripNname + 5, ELEMENTS(stripNname) - 5, pditoa(n));
+		char stripNname[5+12] = "strip";
+		pditoa(n, stripNname + 5);
 		// turn strip name into an atom
 		t_pdatom stripNatom = pd_atom_intern(enc->atoms, stripNname);
 		// find the strip Image resource

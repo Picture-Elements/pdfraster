@@ -55,7 +55,11 @@ typedef struct {
 // in the execution environment
 
 extern pdint32 pdstrlen(const char *s);
-extern char *pditoa(pdint32 i);
+
+// convert a signed integer to NUL-terminated string at dst.
+// Can write up to 12 chars (counting the trailing NUL) at dst.
+extern char *pditoa(pdint32 i, char* dst);
+
 extern char *pdftoa(pddouble n);
 extern char * pdftoaprecision(pddouble n, pddouble precision);
 

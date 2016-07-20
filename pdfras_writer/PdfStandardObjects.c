@@ -14,7 +14,8 @@
 // place at p with trailing NUL and return pointer to that NUL.
 char* pdatoulz(char* p, pduint32 n, int w)
 {
-	char* digits = pditoa(n);
+	char digits[12];
+	pditoa(n, digits);
 	// figure out how many digits to represent n
 	int d = pdstrlen(digits);
 	// lay down those leading 0's

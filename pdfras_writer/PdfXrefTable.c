@@ -248,7 +248,8 @@ static int xref_size(t_pdxref *xref)
 
 static void write_entry(t_pdoutstream *os, pduint32 pos, char *gen, char status)
 {
-	char *s = pditoa((pdint32)pos);
+	char s[12];
+	pditoa((pdint32)pos, s);
 	int len = pdstrlen(s);
 	int i;
 

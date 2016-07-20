@@ -11,28 +11,36 @@ pdint32 pdstrlen(const char *s)
 	return i;
 }
 
-
 #define kMAX_DIGITS 19 /* 64 bit */
-static char itoabuf[kMAX_DIGITS + 2]; /* null and sign */
-extern char *pditoa(pdint32 i)
+
+extern char *pditoa(pdint32 i, char* dst)
 {
-	int neg = i < 0;
-	char *s = itoabuf + kMAX_DIGITS + 1;
-	*s = '\0';
-	if (neg) i = -i;
-	if (i < 0) {
-		// there is one value that can't be negated...
-		*--s = '8';
-		i = 214748364;
+	if (dst) {
+		char *s = dst;
+		char *p = dst;
+		int neg = i < 0;
+		if (neg) i = -i;
+		if (i < 0) {
+			// there is one value that can't be negated...
+			*s++ = '8';
+			i = 214748364;
+		}
+		do
+		{
+			*s++ = (i % 10) + '0';
+			i /= 10;
+		} while (i > 0);
+		if (neg) {
+			*s++ = '-';
+		}
+		*s = '\0';
+		while (p < --s) {
+			char t = *s;
+			*s = *p;
+			*p++ = t;
+		}
 	}
-	do
-	{
-		*--s = (i % 10) + '0';
-		i /= 10;
-	} while (i > 0);
-	if (neg)
-		*--s = '-';
-	return s;
+	return dst;
 }
 
 char * pdftoa(pddouble n) {

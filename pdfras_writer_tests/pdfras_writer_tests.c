@@ -170,6 +170,48 @@ void test_alloc()
 	ASSERT(pd_get_bytes_in_use(pool) == 0);
 }
 
+void test_pditoa()
+{
+	char buffer[20];
+	ASSERT(pditoa(0, NULL) == NULL);
+	ASSERT(pditoa(1234, NULL) == NULL);
+	memset(buffer, '~', sizeof buffer);
+	ASSERT(pditoa(0, buffer) == buffer && 0 == strcmp(buffer, "0"));
+	ASSERT(buffer[2] == '~');
+	ASSERT(pditoa(1, buffer) == buffer && 0 == strcmp(buffer, "1"));
+	ASSERT(buffer[2] == '~');
+	ASSERT(pditoa(-0, buffer) == buffer && 0 == strcmp(buffer, "0"));
+	ASSERT(buffer[2] == '~');
+	ASSERT(pditoa(-1, buffer) == buffer && 0 == strcmp(buffer, "-1"));
+	ASSERT(buffer[3] == '~');
+	ASSERT(pditoa(91, buffer) == buffer && 0 == strcmp(buffer, "91"));
+	ASSERT(buffer[3] == '~');
+	ASSERT(pditoa(-82, buffer) == buffer && 0 == strcmp(buffer, "-82"));
+	ASSERT(buffer[4] == '~');
+	ASSERT(pditoa(703, buffer) == buffer && 0 == strcmp(buffer, "703"));
+	ASSERT(buffer[4] == '~');
+	ASSERT(pditoa(-614, buffer) == buffer && 0 == strcmp(buffer, "-614"));
+	ASSERT(buffer[5] == '~');
+	ASSERT(pditoa(5251, buffer) == buffer && 0 == strcmp(buffer, "5251"));
+	ASSERT(buffer[5] == '~');
+	ASSERT(pditoa(43627, buffer) == buffer && 0 == strcmp(buffer, "43627"));
+	ASSERT(buffer[6] == '~');
+	ASSERT(pditoa(101010, buffer) == buffer && 0 == strcmp(buffer, "101010"));
+	ASSERT(buffer[7] == '~');
+	ASSERT(pditoa(-347380, buffer) == buffer && 0 == strcmp(buffer, "-347380"));
+	ASSERT(buffer[8] == '~');
+	ASSERT(pditoa(-1234567, buffer) == buffer && 0 == strcmp(buffer, "-1234567"));
+	ASSERT(buffer[9] == '~');
+	ASSERT(pditoa(10000000, buffer) == buffer && 0 == strcmp(buffer, "10000000"));
+	ASSERT(buffer[9] == '~');
+	ASSERT(pditoa(666666666, buffer) == buffer && 0 == strcmp(buffer, "666666666"));
+	ASSERT(buffer[10] == '~');
+	ASSERT(pditoa(0x7FFFFFFF, buffer) == buffer && 0 == strcmp(buffer, "2147483647"));
+	ASSERT(buffer[11] == '~');
+	ASSERT(pditoa(0x80000000, buffer) == buffer && 0 == strcmp(buffer, "-2147483648"));
+	ASSERT(buffer[12] == '~');
+}
+
 void test_pd_strcpy()
 {
 	printf("pd_strcpy\n");
@@ -1048,8 +1090,8 @@ static void generate_content(t_pdcontents_gen *gen, void *cookie)
 	int n;
 	// generate simulated page content
 	for (n = 0; n < strips; n++) {
-		char stripNname[12] = "strip";
-		pd_strcpy(stripNname + 5, ELEMENTS(stripNname) - 5, pditoa(n));
+		char stripNname[5+12] = "strip";
+		pditoa(n, stripNname + 5);
 		t_pdatom stripNatom = pd_atom_intern(atoms, stripNname);
 		pd_gen_gsave(gen);
 		pd_gen_concatmatrix(gen, W, 0, 0, SH, tx, ty - SH);
@@ -1093,7 +1135,7 @@ void test_contents_generator()
 	pd_contents_generate(sink, gen);
 	// check correct output generated
 	ASSERT(0 == strcmp(output,
-		" q 1600 0 0 1100 0 1100 cm /Strip0 Do Q q 1600 0 0 1100 0 0 cm /Strip1 Do Q"));
+		" q 1600 0 0 1100 0 1100 cm /strip0 Do Q q 1600 0 0 1100 0 0 cm /strip1 Do Q"));
 	// free the sink
 	pd_datasink_free(sink);
 	// the sink's sink_free handler should be called exactly once:
@@ -1771,6 +1813,8 @@ int main(int argc, char** argv)
 	os.writeoutcookie = &buffer;
 
 	test_alloc();
+
+	test_pditoa();
 
 	test_pd_strcpy();
 	test_pd_strcmp();

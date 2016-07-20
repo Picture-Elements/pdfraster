@@ -125,8 +125,8 @@ void pd_puthex(t_pdoutstream *stm, pduint8 b)
 
 void pd_putint(t_pdoutstream *stm, pdint32 i)
 {
-	char *s = pditoa(i);
-	pd_puts(stm, s);
+	char num[12];
+	pd_puts(stm, pditoa(i, num));
 }
 
 // Write a double to the stream, formatted as a PDF real number.
