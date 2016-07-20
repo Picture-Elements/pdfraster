@@ -13,6 +13,7 @@
 #include "PdfImage.h"
 #include "PdfArray.h"
 
+
 typedef struct t_pdfrasencoder {
 	t_pdmempool*		pool;
 	int					apiLevel;			// caller's specified API level.
@@ -42,21 +43,6 @@ typedef struct t_pdfrasencoder {
 	int					page_front;			// front/back/unspecified
 
 } t_pdfrasencoder;
-
-// utility
-// Allocate and return a copy of string s
-char *pdstrdup(const char* s, struct t_pdmempool *pool)
-{
-	size_t n = pdstrlen(s)+1;
-	char* t = (char*)pd_alloc(pool, n);
-	if (t) {
-		char *p = t;
-		while (n--) {
-			*p++ = *s++;
-		}
-	}
-	return t;
-}
 
 
 t_pdfrasencoder* pdfr_encoder_create(int apiLevel, t_OS *os)

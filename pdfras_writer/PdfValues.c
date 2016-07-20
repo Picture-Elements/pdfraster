@@ -4,8 +4,8 @@
 #include "PdfDict.h"
 #include "PdfArray.h"
 
-static t_pdvalue __pdnull = { TPDNULL, { 0 } };
-static t_pdvalue __pderr = { TPDERRVALUE, { 0 } };
+const t_pdvalue __pdnull = { TPDNULL, { 0 } };
+const t_pdvalue __pderr = { TPDERRVALUE, { 0 } };
 
 t_pdvalue pdatomvalue(t_pdatom v)
 {
