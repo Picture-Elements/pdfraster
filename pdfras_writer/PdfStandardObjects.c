@@ -208,6 +208,8 @@ t_pdvalue pd_trailer_new(t_pdmempool *alloc, t_pdxref *xref, t_pdvalue catalog, 
 t_pdvalue pd_page_new_simple(t_pdmempool *alloc, t_pdxref *xref, t_pdvalue catalog, double width, double height)
 {
 	pdbool succ;
+	double box[4] = { 0.0, 0.0, width, height };
+
 	t_pdvalue pagedict = pd_dict_new(alloc, 20);
 	t_pdvalue pagesdict = pd_dict_get(catalog, PDA_Pages, &succ); /* this is a reference */
 	t_pdvalue resources = pd_dict_new(alloc, 1);
@@ -215,7 +217,7 @@ t_pdvalue pd_page_new_simple(t_pdmempool *alloc, t_pdxref *xref, t_pdvalue catal
 
 	pd_dict_put(pagedict, PDA_Type, pdatomvalue(PDA_Page));
 	pd_dict_put(pagedict, PDA_Parent, pagesdict);
-	pd_dict_put(pagedict, PDA_MediaBox, pdarrayvalue(pd_array_buildfloats(alloc, 4, 0.0, 0.0, width, height)));
+	pd_dict_put(pagedict, PDA_MediaBox, pdarrayvalue(pd_array_buildfloats(alloc, 4, box)));
 	pd_dict_put(pagedict, PDA_Resources, resources);
 	pd_dict_put(resources, PDA_XObject, pd_dict_new(alloc, 20));
 	return pd_xref_makereference(xref, pagedict);

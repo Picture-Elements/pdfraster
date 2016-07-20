@@ -1449,22 +1449,34 @@ void test_arrays()
 	pd_value_free(&array);
 
 	// create the array fresh from some values
-	arr = pd_array_build(pool, 3, hello, pdfloatvalue(1.5), pdnullvalue());
+	t_pdvalue vlist[3];
+	vlist[0] = hello;
+	vlist[1] = pdfloatvalue(1.5);
+	vlist[2] = pdnullvalue();
+	arr = pd_array_build(pool, 3, vlist);
+	ASSERT(3 == pd_array_count(arr));
 	array = pdarrayvalue(arr);
+	ASSERT(IS_ARRAY(array));
 	buffer.pos = 0;
 	pd_write_value(out, array);
 	ASSERT(0 == strcmp(output, "[ (hello?) 1.5 null ]"));
 	pd_value_free(&array);
 
-	arr = pd_array_buildints(pool, 5, (1 << 31), 0, 771723882, -950158714, 0xDEAD);
+	pdint32 intlist[5] = { (1 << 31), 0, 771723882, -950158714, 0xDEAD };
+	arr = pd_array_buildints(pool, 5, intlist);
+	ASSERT(pd_array_count(arr) == 5);
 	array = pdarrayvalue(arr);
+	ASSERT(IS_ARRAY(array));
 	buffer.pos = 0;
 	pd_write_value(out, array);
 	ASSERT(0 == strcmp(output, "[ -2147483648 0 771723882 -950158714 57005 ]"));
 	pd_value_free(&array);
 
-	arr = pd_array_buildfloats(pool, 4, -1.0, 0.0 * -1, 0.376739502, 987654321.5);
+	double box[4] = { -1.0, 0.0 * -1, 0.376739502, 987654321.5 };
+	arr = pd_array_buildfloats(pool, 4, box);
+	ASSERT(pd_array_count(arr) == 4);
 	array = pdarrayvalue(arr);
+	ASSERT(IS_ARRAY(array));
 	buffer.pos = 0;
 	pd_write_value(out, array);
 	// Note: floats (really doubles) with values that we can represent
@@ -1474,11 +1486,22 @@ void test_arrays()
 	pd_value_free(&array);
 
 	// test void pd_array_destroy(t_pdvalue *arr);
-	arr = pd_array_build(pool, 3,
-		pdcstrvalue(pool, "In life,"),
-		pdcstrvalue(pool, "as in art,"),
-		pdcstrvalue(pool, "the beautiful moves in curves."));
+	arr = pd_array_new(pool, 3);
+	ASSERT(pd_array_capacity(arr) == 3);
+	ASSERT(pd_array_count(arr) == 0);
+	pd_array_add(arr, pdcstrvalue(pool, "In life,"));
+	pd_array_add(arr, pdcstrvalue(pool, "as in art,"));
+	pd_array_add(arr, pdcstrvalue(pool, "the beautiful moves in curves."));
+	ASSERT(pd_array_count(arr) == 3);
+	ASSERT(pd_array_capacity(arr) == 3);
+	// setting outside bounds should do nothing:
+	pd_array_set(arr, 3, pdintvalue(42));
+	// and should not change count or capacity:
+	ASSERT(pd_array_count(arr) == 3);
+	ASSERT(pd_array_capacity(arr) == 3);
+
 	array = pdarrayvalue(arr);
+	ASSERT(IS_ARRAY(array));
 	buffer.pos = 0;
 	pd_write_value(out, array);
 	ASSERT(0 == strcmp(output, "[ (In life,) (as in art,) (the beautiful moves in curves.) ]"));

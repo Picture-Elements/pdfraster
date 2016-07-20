@@ -1,12 +1,12 @@
-// class_library.h
+// PdfRasterWriter.h
 
 #pragma once
 
 using namespace System;
 
-namespace class_library {
+namespace PdfRaster {
 
-	public ref class Class1
+	public ref class Writer
 	{
 		// TODO: Add your methods for this class here.
 	};

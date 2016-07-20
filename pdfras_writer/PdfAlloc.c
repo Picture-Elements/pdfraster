@@ -22,7 +22,7 @@ typedef struct _t_heapelem
 	//pduint8 data[0];
 } t_heapelem;
 
-t_pdmempool *pd_alloc_new_pool(t_OS *os)
+extern t_pdmempool *pd_alloc_new_pool(t_OS *os)
 {
 	t_pdmempool *pool = 0; 
 	if (!os) return 0;

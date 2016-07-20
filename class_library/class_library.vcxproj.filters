@@ -11,14 +11,6 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="class_library.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-  </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="class_library.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="AssemblyInfo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -76,5 +68,13 @@
     <ClCompile Include="..\pdfras_writer\PdfXrefTable.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="PdfRasterWriter.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="PdfRasterWriter.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

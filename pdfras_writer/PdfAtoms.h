@@ -5,6 +5,10 @@
 #include "PdfOS.h"
 #include "PdfValues.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef struct t_pdatomtable t_pdatomtable;
 
 extern const char *pd_atom_name(t_pdatom atom);
@@ -19,4 +23,7 @@ extern void pd_atom_table_free(t_pdatomtable* atoms);
 // Return the number of distinct entries (atoms) in an atom table.
 extern int pd_atom_table_count(t_pdatomtable* atoms);
 
+#ifdef __cplusplus
+}
+#endif
 #endif

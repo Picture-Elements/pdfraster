@@ -5,6 +5,10 @@
 #include "PdfPlatform.h"
 #include "PdfAlloc.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef void* t_pdatom;
 
 /* OPTIONAL|REFERENCE|TYPE */
@@ -92,4 +96,7 @@ extern int pd_value_eq(t_pdvalue a, t_pdvalue b);
 // to the same underlying dict, stream, array or string.
 extern void pd_value_free(t_pdvalue *v);
 
+#ifdef __cplusplus
+}
+#endif
 #endif

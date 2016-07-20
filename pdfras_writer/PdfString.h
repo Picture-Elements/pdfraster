@@ -5,6 +5,10 @@
 #include "PdfAlloc.h"
 #include "PdfValues.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 // construct a new (non-binary) string object of length n.
 // if string != NULL, initialize with 1st n chars of string.
 extern t_pdstring *pd_string_new(t_pdmempool *alloc, pduint32 len, const char* string);
@@ -42,4 +46,7 @@ extern int pd_string_compare(t_pdstring *s1, t_pdstring *s2);
 typedef pdbool(*f_pdstring_foreach)(pduint32 index, pduint8 c, void *cookie);
 extern void pd_string_foreach(t_pdstring *str, f_pdstring_foreach iter, void *cookie);
 
+#ifdef __cplusplus
+}
+#endif
 #endif

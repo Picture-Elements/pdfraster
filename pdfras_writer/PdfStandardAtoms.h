@@ -4,6 +4,10 @@
 
 #include "PdfValues.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define __ATOM(n) ((t_pdatom)n)
 
 #define PDA_UNDEFINED_ATOM ((t_pdatom)__ATOM_UNDEFINED_ATOM)
@@ -136,4 +140,7 @@ extern char* __ATOM_Gamma;
 extern char* __ATOM_N;
 extern char* __ATOM_ASCIIHexDecode;
 
+#ifdef __cplusplus
+}
+#endif
 #endif

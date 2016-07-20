@@ -3,6 +3,10 @@
 #pragma once
 
 #include "PdfOS.h"
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 
 typedef struct t_pdmempool t_pdmempool;
 
@@ -63,6 +67,10 @@ extern void pd_alloc_free_pool(t_pdmempool *sys);
 #define pd_alloc(allocsys, bytes) __pd_alloc(allocsys, bytes, LOCATION)
 #else
 #define pd_alloc(allocsys, bytes) (__pd_alloc(allocsys, bytes, 0))
+#endif
+
+#ifdef __cplusplus
+}
 #endif
 #endif
 

@@ -24,6 +24,7 @@
     <Keyword>ManagedCProj</Keyword>
     <RootNamespace>class_library</RootNamespace>
     <WindowsTargetPlatformVersion>8.1</WindowsTargetPlatformVersion>
+    <ProjectName>pdfras_writer_managed</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -132,7 +133,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="class_library.h" />
+    <ClInclude Include="PdfRasterWriter.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\pdfras_writer\md5.c">
@@ -244,7 +245,7 @@
       <CompileAs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">CompileAsCpp</CompileAs>
     </ClCompile>
     <ClCompile Include="AssemblyInfo.cpp" />
-    <ClCompile Include="class_library.cpp" />
+    <ClCompile Include="PdfRasterWriter.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -59,10 +59,10 @@ extern t_pdarray *pd_array_build(t_pdmempool *pool, pduint32 n, /* t_pdvalue val
 
 // Create and return an array containing the n variable arguments (of type pdint32).
 // If memory allocation fails, returns the error value.
-extern t_pdarray *pd_array_buildints(t_pdmempool *pool, pduint32 n, /* pdint32 value, */ ...);
+extern t_pdarray *pd_array_buildints(t_pdmempool *pool, pduint32 n, pdint32 values[]);
 
 // Create and return an array containing the n variable arguments (of type double).
 // If memory allocation fails, returns the error value.
-extern t_pdarray *pd_array_buildfloats(t_pdmempool *pool, pduint32 n, /* double value, */...);
+extern t_pdarray *pd_array_buildfloats(t_pdmempool *pool, pduint32 n, double values[]);
 
 #endif

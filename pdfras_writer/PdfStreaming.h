@@ -12,6 +12,10 @@
 #include "PdfValues.h"
 #include "PdfSecurityHandler.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 // When writing PDF, floats (reals) are only represented
 // to this many digits of precision:
 #define REAL_PRECISION 10
@@ -106,4 +110,7 @@ extern void pd_outstream_set_event_handler(t_pdoutstream *stm, PdfOutputEventCod
 // The event handler is called with the stream, the cookie, the eventid, and the arglist.
 extern int pd_outstream_fire_event(t_pdoutstream *stm, PdfOutputEventCode eventid);
 
+#ifdef __cplusplus
+}
+#endif
 #endif

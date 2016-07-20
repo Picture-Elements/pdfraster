@@ -1,5 +1,4 @@
 #include "PdfArray.h"
-#include <stdarg.h>
 #include <assert.h>
 
 #define kSomeReasonableDefaultSize 12
@@ -179,57 +178,48 @@ void pd_array_foreach(t_pdarray *arr, f_pdarray_iterator iter, void *cookie)
 	}
 }
 
-t_pdarray *pd_array_build(t_pdmempool *pool, pduint32 n, /* t_pdvalue value, */...)
+t_pdarray *pd_array_build(t_pdmempool *pool, pduint32 n, t_pdvalue values[])
 {
 	// allocate an array with capacity for n elements
 	t_pdarray *arr = pd_array_new(pool, n);
 	if (arr) {
-		va_list ap;
 		pduint32 i;
-		va_start(ap, n);
 		for (i = 0; i < n; i++)
 		{
 			// not very efficient...
-			pd_array_add(arr, va_arg(ap, t_pdvalue));
+			pd_array_add(arr, values[i]);
 		}
-		va_end(ap);
 		// we end up with an n-element array
 		assert(arr->size == n);
 	}
 	return arr;
 }
 
-t_pdarray *pd_array_buildints(t_pdmempool *pool, pduint32 n, /* pdint32 value, */  ...)
+t_pdarray *pd_array_buildints(t_pdmempool *pool, pduint32 n, pdint32 values[])
 {
 	t_pdarray *arr = pd_array_new(pool, n);
 	if (arr) {
-		va_list ap;
 		pduint32 i;
-		va_start(ap, n);
 		for (i = 0; i < n; i++)
 		{
-			pd_array_add(arr, pdintvalue(va_arg(ap, pdint32)));
+			pd_array_add(arr, pdintvalue(values[i]));
 		}
-		va_end(ap);
 		// we end up with an n-element array
 		assert(arr->size == n);
 	}
 	return arr;
 }
 
-t_pdarray *pd_array_buildfloats(t_pdmempool *pool, pduint32 n, /* double value, */ ...)
+t_pdarray *pd_array_buildfloats(t_pdmempool *pool, pduint32 n, double values[])
 {
 	t_pdarray *arr = pd_array_new(pool, n);
 	if (arr) {
-		va_list ap;
 		pduint32 i;
-		va_start(ap, n);
 		for (i = 0; i < n; i++)
 		{
-			double v = va_arg(ap, double);
+			double v = values[i];
 			pd_array_add(arr, pdfloatvalue(v));
 		}
-		va_end(ap);
 		// we end up with an n-element array
 		assert(arr->size == n);
 	}

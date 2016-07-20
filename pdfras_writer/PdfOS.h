@@ -4,6 +4,10 @@
 
 #include "PdfPlatform.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 // Signature of the memory allocation (malloc) function to be used by the Pdf library
 typedef void *(*fAllocate)(size_t bytes);
 // (The signature of) the matching free.
@@ -63,4 +67,7 @@ extern char *pditoa(pdint32 i, char* dst);
 // use this macro to suppress "unreferenced formal parameter" warnings
 #define UNUSED_FORMAL(x) ((void)(x))
 
+#ifdef __cplusplus
+}
+#endif
 #endif

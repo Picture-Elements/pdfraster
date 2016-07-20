@@ -1392,6 +1392,7 @@ static int get_page_info(t_pdfrasreader* reader, int p, t_pdfpageinfo* pinfo)
 		}
 		else {
 			// all strips on a page must have the same width
+			// TODO: report error instead of assert
 			assert(pinfo->width == width);
 		}
 		if (!dictionary_lookup(reader, strip, "/ColorSpace", &val)) {
