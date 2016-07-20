@@ -527,10 +527,12 @@ void test_floating_point_output()
 	ASSERT(0 == strcmp(output, "-1"));
 
 	buffer.pos = 0;
+	// largest 32-bit integer
 	pd_putfloat(out, 2147483647.0);
 	ASSERT(0 == strcmp(output, "2147483647"));
 
 	buffer.pos = 0;
+	// smallest 32-bit integer
 	pd_putfloat(out, -2147483648.0);
 	ASSERT(0 == strcmp(output, "-2147483648"));
 

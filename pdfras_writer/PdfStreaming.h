@@ -66,9 +66,10 @@ extern void pd_putint(t_pdoutstream *stm, pdint32 i);
 // Write a floating-point number to a stream.
 // A traditional decimal fractional notation is used,
 // [-]integer-part[.fraction]
-// The leading minus is output if and only if the value f < 0.
-// The fractional part is output if and if the value is not integral.
-// Exact integral values are output as integers without the fractional part.
+// The leading minus is output iff the value f < 0.
+// The fractional part is output iff the value is not integral:
+// Exact integral values are output as integers.
+// (-0.0 is output as "0")
 // This function is not obligated to output more than REAL_PRECISION significant digits.
 // The decimal separator is *always* a period, '.'.
 // Given any NaN, writes "nan".

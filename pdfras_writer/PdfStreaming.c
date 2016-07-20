@@ -129,14 +129,6 @@ void pd_putint(t_pdoutstream *stm, pdint32 i)
 	pd_puts(stm, pditoa(i, num));
 }
 
-// Write a double to the stream, formatted as a PDF real number.
-// NaNs are output as "nan"
-// Infinities are output as "inf" or "-inf"
-// 0.0 is treated as always positive (IEEE 754 has signed zeroes)
-// There is no exponential notation.
-// Integral values are output as integers, without decimal point.
-// Numbers with fractional part are output with only (approximately)
-// REAL_PRECISION digits of precision.
 void pd_putfloat(t_pdoutstream *stm, pddouble n)
 {
 	// one weakness: with numbers > 10^16, you get noise digits
