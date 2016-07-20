@@ -22,7 +22,7 @@ typedef struct t_pdhashatomtovalue {
 // Initialize hash table to have capacity for size entries
 static void init_table(t_pdhashatomtovalue *hash, pduint32 size)
 {
-	hash->buckets = pd_alloc_same_pool(hash, sizeof(t_bucket)* size);
+	hash->buckets = (t_bucket*)pd_alloc_same_pool(hash, sizeof(t_bucket) * size);
 	if (hash->buckets) {
 		pduint32 i;
 		hash->capacity = size;
@@ -40,7 +40,7 @@ t_pdhashatomtovalue *pd_hashatomtovalue_new(t_pdmempool *pool, pduint32 initialC
 {
 	t_pdhashatomtovalue *hash = NULL;
 	if (pool) {
-		hash = pd_alloc(pool, sizeof(t_pdhashatomtovalue));
+		hash = (t_pdhashatomtovalue*)pd_alloc(pool, sizeof(t_pdhashatomtovalue));
 		if (hash) {
 			hash->elements = 0;
 			init_table(hash, initialCap == 0 ? kSomeReasonableInitialSize : initialCap);

@@ -21,7 +21,7 @@ char * pd_strdup(t_pdmempool *alloc, const char *str)
 	char* dup = 0;
 	if (str) {
 		int len = pdstrlen(str) + 1;
-		dup = pd_alloc(alloc, len);
+		dup = (char*)pd_alloc(alloc, len);
 		if (dup) {
 			pd_strcpy(dup, len, str);
 		}

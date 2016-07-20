@@ -19,7 +19,7 @@ typedef struct _t_heapelem
 #if PDDEBUG
 	char *location;				// hint about where/who allocated.
 #endif
-	pduint8 data[0];
+	//pduint8 data[0];
 } t_heapelem;
 
 t_pdmempool *pd_alloc_new_pool(t_OS *os)
@@ -27,7 +27,7 @@ t_pdmempool *pd_alloc_new_pool(t_OS *os)
 	t_pdmempool *pool = 0; 
 	if (!os) return 0;
 
-	pool = os->alloc(sizeof(t_pdmempool));
+	pool = (t_pdmempool*)os->alloc(sizeof(t_pdmempool));
 	if (!pool) return NULL;
 	pool->os = os;
 	pool->alloc_count = 0;
@@ -59,7 +59,7 @@ void pd_free(void *ptr)
 t_pdmempool *pd_get_pool(void *ptr)
 {
 	if (!ptr) return NULL;
-	int offset = offsetof(t_heapelem, data);
+	int offset = sizeof(t_heapelem); // offsetof(t_heapelem, data);
 	t_heapelem *elem = (t_heapelem *)(((pduint8 *)ptr) - offset);
 	return elem->pool;
 }
@@ -69,7 +69,7 @@ void *__pd_alloc(t_pdmempool *pool, size_t bytes, char *loc)
 
 	if (!pool) return NULL;
 	size_t totalBytes = bytes + sizeof(t_heapelem);
-	t_heapelem *elem = pool->os->alloc(totalBytes);
+	t_heapelem *elem = (t_heapelem*)pool->os->alloc(totalBytes);
 	if (!elem) return 0;
 
 	elem->size = bytes;
@@ -91,14 +91,15 @@ void *__pd_alloc(t_pdmempool *pool, size_t bytes, char *loc)
 	(void)loc;			// UNUSED
 #endif
 	// fill block with 0's
-	pool->os->memset(elem->data, 0, bytes);
-	return elem->data;
+	pduint8* data = (pduint8*)elem + sizeof(t_heapelem);
+	pool->os->memset(data, 0, bytes);
+	return data;
 }
 
 void __pd_free(void *ptr, pdbool validate)
 {
 	if (ptr) {
-		int offset = offsetof(t_heapelem, data);
+		int offset = sizeof(t_heapelem);	// offsetof(t_heapelem, data);
 		t_heapelem *elem = (t_heapelem *)(((pduint8 *)ptr) - offset);
 		t_pdmempool *pool = elem->pool;
 		if (validate)
@@ -107,7 +108,8 @@ void __pd_free(void *ptr, pdbool validate)
 			t_heapelem *walker = pool->first;
 			while (walker)
 			{
-				if (walker->data == ptr) break;
+				pduint8* data = (pduint8*)walker + sizeof(t_heapelem);
+				if (data == ptr) break;
 				walker = walker->prev;
 			}
 			assert(walker);
@@ -134,7 +136,7 @@ void __pd_free(void *ptr, pdbool validate)
 size_t pd_get_block_size(void* block)
 {
 	if (block) {
-		int offset = offsetof(t_heapelem, data);
+		int offset = sizeof(t_heapelem);	// offsetof(t_heapelem, data);
 		t_heapelem *elem = (t_heapelem *)(((pduint8 *)block) - offset);
 		return elem->size;
 	}
@@ -147,7 +149,7 @@ void pd_pool_clean(t_pdmempool* pool)
 {
 	if (pool) {
 		while (pool->first) {
-			void* block = pool->first->data;
+			void* block = (pduint8*)(pool->first) + sizeof(t_heapelem);
 			__pd_free(block, 0);
 		}
 		assert(pool->first == NULL);

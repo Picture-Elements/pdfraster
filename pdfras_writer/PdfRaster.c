@@ -477,10 +477,9 @@ long pdfr_encoder_bytes_written(t_pdfrasencoder* enc)
 	return pd_outstream_pos(enc->stm);
 }
 
-static int pdfr_write_sig(t_pdvalue trailer, t_pdoutstream *stm)
+static void pdfr_write_sig(t_pdvalue trailer, t_pdoutstream *stm)
 {
     pd_puts(stm, "\n%PDF-raster-" PDFRASTER_SPEC_VERSION "\n");
-    return 0;
 }
 
 void pdfr_encoder_end_document(t_pdfrasencoder* enc)

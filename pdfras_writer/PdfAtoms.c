@@ -127,7 +127,7 @@ static int search_atom_table(t_pdatomtable *atoms, const char* name)
 {
 	int i;
 	for (i = 0; i < (int)atoms->elements; i++) {
-		if (0 == pd_strcmp(atoms->buckets[i], name)) {
+		if (0 == pd_strcmp(pd_atom_name(atoms->buckets[i]), name)) {
 			return i;
 		}
 	}

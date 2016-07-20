@@ -103,7 +103,7 @@ void pd_putc(t_pdoutstream *stm, char c)
 void pd_putn(t_pdoutstream *stm, const void* s, pduint32 offset, pduint32 len)
 {
 	if (stm) {
-		stm->pos += stm->writer(s, offset, len, stm->writercookie);
+		stm->pos += stm->writer((pduint8*)s, offset, len, stm->writercookie);
 	}
 }
 
