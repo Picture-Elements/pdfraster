@@ -18,7 +18,7 @@
     <ClCompile Include="..\common\test_support.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="reader_test.c">
+    <ClCompile Include="pdfras_reader_tests.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

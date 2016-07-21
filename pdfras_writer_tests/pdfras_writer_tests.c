@@ -172,6 +172,8 @@ void test_alloc()
 
 void test_pditoa()
 {
+	printf("pditoa\n");
+
 	char buffer[20];
 	ASSERT(pditoa(0, NULL) == NULL);
 	ASSERT(pditoa(1234, NULL) == NULL);
