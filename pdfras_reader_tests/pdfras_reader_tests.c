@@ -89,11 +89,11 @@ void page_info_tests()
 	ASSERT(7 == pdfrasread_page_count(reader));
 
 	ASSERT(RASREAD_BITONAL == pdfrasread_page_format(reader, 0));
-	ASSERT(8 == pdfrasread_page_width(reader, 0));
-	ASSERT(11 == pdfrasread_page_height(reader, 0));
+	ASSERT(850 == pdfrasread_page_width(reader, 0));
+	ASSERT(1100 == pdfrasread_page_height(reader, 0));
 	ASSERT(0 == pdfrasread_page_rotation(reader, 0));
-	ASSERT(2.0 == pdfrasread_page_horizontal_dpi(reader, 0));
-	ASSERT(2.0 == pdfrasread_page_vertical_dpi(reader, 0));
+	ASSERT(100.0 == pdfrasread_page_horizontal_dpi(reader, 0));
+	ASSERT(100.0 == pdfrasread_page_vertical_dpi(reader, 0));
 
 	ASSERT(RASREAD_GRAY16 == pdfrasread_page_format(reader, 1));
 	ASSERT(64 == pdfrasread_page_width(reader, 1));

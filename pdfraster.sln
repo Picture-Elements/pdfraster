@@ -10,11 +10,6 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "pdfras_writer", "pdfras_wri
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "pdfras_reader", "pdfras_reader\pdfras_reader.vcxproj", "{C06A94CA-439B-4C91-9FA3-F9C2E3487473}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "reader_test", "reader_test\reader_test.vcxproj", "{34032D75-96A8-43EE-ADBF-F2B68AA4218D}"
-	ProjectSection(ProjectDependencies) = postProject
-		{C06A94CA-439B-4C91-9FA3-F9C2E3487473} = {C06A94CA-439B-4C91-9FA3-F9C2E3487473}
-	EndProjectSection
-EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "xxd", "xxd\xxd.vcxproj", "{B35FE1C3-D922-41BF-BB0B-25AA4E913060}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "demo_low_level", "demo_low_level\demo_low_level.vcxproj", "{C74CA555-AE5D-4057-B94B-2D13BB8CA27E}"
@@ -36,6 +31,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "pdfras_writer_tests", "pdfr
 	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "pdfras_writer_managed", "pdfras_writer_managed\pdfras_writer_managed.vcxproj", "{943AD428-4D74-49AA-807C-36D854FA7723}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "pdfras_reader_tests", "pdfras_reader_tests\pdfras_reader_tests.vcxproj", "{34032D75-96A8-43EE-ADBF-F2B68AA4218D}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -63,14 +60,6 @@ Global
 		{C06A94CA-439B-4C91-9FA3-F9C2E3487473}.Release|Win32.ActiveCfg = Release|Win32
 		{C06A94CA-439B-4C91-9FA3-F9C2E3487473}.Release|Win32.Build.0 = Release|Win32
 		{C06A94CA-439B-4C91-9FA3-F9C2E3487473}.Release|x64.ActiveCfg = Release|Win32
-		{34032D75-96A8-43EE-ADBF-F2B68AA4218D}.Debug|Any CPU.ActiveCfg = Debug|Win32
-		{34032D75-96A8-43EE-ADBF-F2B68AA4218D}.Debug|Win32.ActiveCfg = Debug|Win32
-		{34032D75-96A8-43EE-ADBF-F2B68AA4218D}.Debug|Win32.Build.0 = Debug|Win32
-		{34032D75-96A8-43EE-ADBF-F2B68AA4218D}.Debug|x64.ActiveCfg = Debug|Win32
-		{34032D75-96A8-43EE-ADBF-F2B68AA4218D}.Release|Any CPU.ActiveCfg = Release|Win32
-		{34032D75-96A8-43EE-ADBF-F2B68AA4218D}.Release|Win32.ActiveCfg = Release|Win32
-		{34032D75-96A8-43EE-ADBF-F2B68AA4218D}.Release|Win32.Build.0 = Release|Win32
-		{34032D75-96A8-43EE-ADBF-F2B68AA4218D}.Release|x64.ActiveCfg = Release|Win32
 		{B35FE1C3-D922-41BF-BB0B-25AA4E913060}.Debug|Any CPU.ActiveCfg = Debug|Win32
 		{B35FE1C3-D922-41BF-BB0B-25AA4E913060}.Debug|Win32.ActiveCfg = Debug|Win32
 		{B35FE1C3-D922-41BF-BB0B-25AA4E913060}.Debug|Win32.Build.0 = Debug|Win32
@@ -121,6 +110,14 @@ Global
 		{943AD428-4D74-49AA-807C-36D854FA7723}.Release|Win32.Build.0 = Release|Win32
 		{943AD428-4D74-49AA-807C-36D854FA7723}.Release|x64.ActiveCfg = Release|x64
 		{943AD428-4D74-49AA-807C-36D854FA7723}.Release|x64.Build.0 = Release|x64
+		{34032D75-96A8-43EE-ADBF-F2B68AA4218D}.Debug|Any CPU.ActiveCfg = Debug|Win32
+		{34032D75-96A8-43EE-ADBF-F2B68AA4218D}.Debug|Win32.ActiveCfg = Debug|Win32
+		{34032D75-96A8-43EE-ADBF-F2B68AA4218D}.Debug|Win32.Build.0 = Debug|Win32
+		{34032D75-96A8-43EE-ADBF-F2B68AA4218D}.Debug|x64.ActiveCfg = Debug|Win32
+		{34032D75-96A8-43EE-ADBF-F2B68AA4218D}.Release|Any CPU.ActiveCfg = Release|Win32
+		{34032D75-96A8-43EE-ADBF-F2B68AA4218D}.Release|Win32.ActiveCfg = Release|Win32
+		{34032D75-96A8-43EE-ADBF-F2B68AA4218D}.Release|Win32.Build.0 = Release|Win32
+		{34032D75-96A8-43EE-ADBF-F2B68AA4218D}.Release|x64.ActiveCfg = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

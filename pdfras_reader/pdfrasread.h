@@ -18,7 +18,9 @@ extern "C" {
 
 #define RASREAD_API_LEVEL	1
 
-#define PDFRASREAD_VERSION "0.3"
+#define PDFRASREAD_VERSION "0.4"
+// 0.4	spike	2016.07.21	first formal reporting of compliance failures
+//							reader test fails down to 27.
 // 0.3	spike	2016.07.19	minor API and internal improvements
 // 0.2	spike	2016.07.13	revised PDF-raster marker in trailer dict.
 // 0.1	spike	2015.02.11	1st version
@@ -123,6 +125,26 @@ size_t pdfrasread_max_strip_size(t_pdfrasreader* reader, int p);
 // the return value will be 0.
 size_t pdfrasread_read_raw_strip(t_pdfrasreader* reader, int p, int s, void* buffer, size_t bufsize);
 
+// detailed error codes
+typedef enum {
+	READ_OK = 0,
+	READ_PAGE_TYPE,					// page dict must have /Type /Page
+	READ_PAGE_ROTATION,				// page rotation if present must be an inline non-negative multiple of 90.
+	READ_PAGE_MEDIABOX,				// each page dict must have a /MediaBox entry
+	READ_RESOURCES,					// each page dictionary must have a /Resources entry (that is a dictionary)
+	READ_XOBJECT,					// page resource dictionary must have /XObject entry
+	READ_XOBJECT_DICT,				// XObject has to be a dictionary
+	READ_XOBJECT_ENTRY,				// only entries in xobject dict must be /strip<n>
+	READ_NOT_STRIP_REF,				// strip entry in xobject dict must be an indirect reference to a dictionary
+	READ_STRIP_SUBTYPE,				// strip must have /Subtype /Image
+	READ_BITSPERCOMPONENT,			// strip must have /BitsPerComponent with inline unsigned integer value.
+	READ_STRIP_HEIGHT,				// strip must have /Height entry with inline non-negative integer value
+	READ_STRIP_WIDTH,				// strip must have /Width entry with inline non-negative integer value
+	READ_STRIP_COLORSPACE,			// strip must have a /Colorspace entry
+	READ_INVALID_COLORSPACE,		// colorspace must comply with spec
+	READ_STRIP_LENGTH,				// strip must have /Length with non-negative inline integer value
+
+} ReadErrorCode;
 
 #ifdef __cplusplus
 }

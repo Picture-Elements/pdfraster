@@ -217,6 +217,12 @@ int pdfrasread_recognize_source(pdfras_freader readfn, void* source)
 	return pdfras_recognize_pdrf_tail(buffer);
 }
 
+// report a failure to comply with the PDF/raster spec, at offset in file
+static void compliance_error(t_pdfrasreader* reader, int code, pduint32 offset)
+{
+	fprintf(stderr, "* COMPLIANCE offset +%06u, code %d\n", offset, code);
+}
+
 ///////////////////////////////////////////////////////////////////////
 // Single-character scanning methods
 
@@ -1299,6 +1305,7 @@ static int decode_strip_format(t_pdfrasreader* reader, pduint32* poff, unsigned 
 static int get_page_info(t_pdfrasreader* reader, int p, t_pdfpageinfo* pinfo)
 {
 	if (!reader || !pinfo) {
+		// TODO: internal error
 		return FALSE;
 	}
 	// clear info to all 0's
@@ -1310,41 +1317,55 @@ static int get_page_info(t_pdfrasreader* reader, int p, t_pdfpageinfo* pinfo)
 	// look up the file position of the nth page object:
 	pduint32 page = get_page_pos(reader, p);
 	if (!page) {
+		// TODO: internal error
 		return FALSE;
 	}
 	pinfo->off = page;
 	pduint32 val;
 	if (!dictionary_lookup(reader, page, "/Type", &val) || !token_match(reader, &val, "/Page")) {
 		// bad page object, not marked /Type /Page
+		compliance_error(reader, READ_PAGE_TYPE, page);
 		return FALSE;
 	}
-	// rotation is stored in the page object
+	// a page may be rotated for rendering, by a non-negative
+	// multiple of 90 degrees (clockwise).
 	// note: if not present defaults to 0.
-	if (dictionary_lookup(reader, page, "/Rotate", &val) && !token_ulong(reader, &val, &pinfo->rotation)) {
-		return FALSE;
+	if (dictionary_lookup(reader, page, "/Rotate", &val)) {
+		unsigned long angle;
+		if (!token_ulong(reader, &val, &angle) ||
+			angle % 90 != 0) {
+			compliance_error(reader, READ_PAGE_ROTATION, val);
+			return FALSE;
+		}
+		pinfo->rotation = angle % 360;
 	}
 	// similarly for mediabox
 	if (!dictionary_lookup(reader, page, "/MediaBox", &val) || !parse_media_box(reader, &val, pinfo->MediaBox)) {
+		compliance_error(reader, READ_PAGE_MEDIABOX, page);
 		return FALSE;
 	}
 	pduint32 resdict;
 	if (!dictionary_lookup(reader, page, "/Resources", &resdict)) {
 		// bad page object, no /Resources entry
+		compliance_error(reader, READ_RESOURCES, page);
 		return FALSE;
 	}
 	// In the Resources dictionary find the XObject dictionary
 	pduint32 xobjects;
 	if (!dictionary_lookup(reader, resdict, "/XObject", &xobjects)) {
 		// bad resource dictionary, no /XObject entry
+		compliance_error(reader, READ_XOBJECT, resdict);
 		return FALSE;
 	}
 	// Traverse the XObject dictionary collecting strip info
 	if (!token_match(reader, &xobjects, "<<")) {
 		// invalid PDF: XObject dictionary doesn't start with '<<'
+		compliance_error(reader, READ_XOBJECT_DICT, xobjects);
 		return FALSE;
 	}
 	int n;				// strip no
 	for (n = 0; !token_match(reader, &xobjects, ">>"); n++) {
+		pduint32 xobj_entry = xobjects;
 		if (peekch(reader, xobjects) != '/' ||
 			nextch(reader, &xobjects) != 's' ||
 			nextch(reader, &xobjects) != 't' ||
@@ -1353,30 +1374,36 @@ static int get_page_info(t_pdfrasreader* reader, int p, t_pdfpageinfo* pinfo)
 			nextch(reader, &xobjects) != 'p' ||
 			!isdigit(nextch(reader, &xobjects))
 			) {
-			// end of strips in XObject dictionary
-			break;
+			// illegal entry in xobjects dictionary - only /strip<n> allowed
+			compliance_error(reader, READ_XOBJECT_ENTRY, xobj_entry);
+			return FALSE;
 		}
 		unsigned long stripno;
-		if (!token_ulong(reader, &xobjects, &stripno) || stripno != n) {
+		if (!token_ulong(reader, &xobjects, &stripno)) {
 			// PDF/raster: strips must be named /strip0, /strip1, /strip2, etc.
+			compliance_error(reader, READ_XOBJECT_ENTRY, xobjects);
 			return FALSE;
 		}
 		pduint32 strip;
 		if (!parse_indirect_reference(reader, &xobjects, &strip)) {
 			// invalid PDF: strip entry in XObject dict doesn't point to strip stream
+			compliance_error(reader, READ_NOT_STRIP_REF, xobj_entry);
 			return FALSE;
 		}
 		if (!dictionary_lookup(reader, strip, "/Subtype", &val) || !token_match(reader, &val, "/Image")) {
 			// strip isn't an image?
+			compliance_error(reader, READ_STRIP_SUBTYPE, strip);
 			return FALSE;
 		}
 		if (!dictionary_lookup(reader, strip, "/BitsPerComponent", &val) || !token_ulong(reader, &val, &pinfo->BitsPerComponent)) {
 			// strip doesn't have BitsPerComponent?
+			compliance_error(reader, READ_BITSPERCOMPONENT, strip);
 			return FALSE;
 		}
 		unsigned long strip_height;
 		if (!dictionary_lookup(reader, strip, "/Height", &val) || !token_ulong(reader, &val, &strip_height)) {
-			// strip doesn't have Length?
+			// strip doesn't have /Height with non-negative integer value
+			compliance_error(reader, READ_STRIP_HEIGHT, strip);
 			return FALSE;
 		}
 		// page height is sum of strip heights
@@ -1385,6 +1412,7 @@ static int get_page_info(t_pdfrasreader* reader, int p, t_pdfpageinfo* pinfo)
 		unsigned long width;
 		if (!dictionary_lookup(reader, strip, "/Width", &val) || !token_ulong(reader, &val, &width)) {
 			// strip doesn't have Width?
+			compliance_error(reader, READ_STRIP_WIDTH, strip);
 			return FALSE;
 		}
 		if (stripno == 0) {
@@ -1397,16 +1425,19 @@ static int get_page_info(t_pdfrasreader* reader, int p, t_pdfpageinfo* pinfo)
 		}
 		if (!dictionary_lookup(reader, strip, "/ColorSpace", &val)) {
 			// PDF/raster: image object, each strip must have a named ColorSpace
+			compliance_error(reader, READ_STRIP_COLORSPACE, strip);
 			return FALSE;
 		}
 		if (!parse_color_space(reader, &val, stripno, pinfo)) {
 			// PDF/raster: invalid color space in strip
+			compliance_error(reader, READ_INVALID_COLORSPACE, val);
 			return FALSE;
 		}
 		// max_strip_size is (surprise) the maximum of the strip sizes (in bytes)
 		long strip_size;
 		if (!dictionary_lookup(reader, strip, "/Length", &val) || !parse_long_value(reader, &val, &strip_size)) {
 			// invalid PDF: strip image must have /Length
+			compliance_error(reader, READ_STRIP_LENGTH, strip);
 			return FALSE;
 		}
 		pinfo->max_strip_size = ulmax(pinfo->max_strip_size, (unsigned long)strip_size);
