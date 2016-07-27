@@ -459,6 +459,8 @@ int write_rgb24_uncompressed_multistrip_file(t_OS os, const char* filename)
 	return 0;
 }
 
+// write an sRGB 8-bit/channel color image with JPEG compression
+// 100 dpi, -180 rotation, 850 x 1100
 void write_rgb24_jpeg_page(t_pdfrasencoder* enc)
 {
 	pdfr_encoder_set_resolution(enc, 100.0, 100.0);

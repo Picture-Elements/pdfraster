@@ -27,7 +27,7 @@ typedef struct t_pdfrasencoder {
 	t_pdvalue			info;
 	t_pdvalue			trailer;
 	// optional document objects
-	t_pdvalue			srgbColorspace;		// ICCBased sRGB colorspace
+	t_pdvalue			iccColorspace;		// current ICCBased colorspace, if any
 	// current page object and related values
 	t_pdvalue			currentPage;
 	double				xdpi;				// horizontal resolution, pixels/inch
@@ -93,7 +93,7 @@ t_pdfrasencoder* pdfr_encoder_create(int apiLevel, t_OS *os)
 		pd_dict_put(enc->info, PDA_CreationDate, pd_make_time_string(pool, enc->creationDate));
 		// we don't modify PDF so there is no ModDate
 
-		assert(IS_NULL(enc->srgbColorspace));
+		assert(IS_NULL(enc->iccColorspace));
 		assert(IS_NULL(enc->currentPage));
 
 		// Write the PDF header:
@@ -230,18 +230,19 @@ static void onimagedataready(t_datasink *sink, void *eventcookie)
 	pd_datasink_put(sink, pinfo->data, 0, pinfo->count);
 }
 
-t_pdvalue pdfr_encoder_get_srgb_colorspace(t_pdfrasencoder* enc)
+t_pdvalue pdfr_encoder_get_ICCcolorspace(t_pdfrasencoder* enc)
 {
-	// Just use a single sRGB colorspace for the entire document,
-	// created when first needed.
-	if (IS_ERR(enc->srgbColorspace)) {
+    // if there's no current iccColorSpace
+	if (IS_NULL(enc->iccColorspace)) {
+        // create a standard sRGB colorspace (which is a particular
+        // ICC color space
 		t_pdvalue srgb = pd_make_srgb_colorspace(enc->pool, enc->xref);
 		// flush the colorspace profile to the output
 		t_pdvalue profile = pd_array_get(srgb.value.arrvalue, 1);
 		pd_write_reference_declaration(enc->stm, profile);
-		enc->srgbColorspace = srgb;
+		enc->iccColorspace = srgb;
 	}
-	return enc->srgbColorspace;
+	return enc->iccColorspace;
 }
 
 t_pdvalue pdfr_encoder_get_calgray_colorspace(t_pdfrasencoder* enc)
@@ -264,7 +265,7 @@ t_pdvalue pdfr_encoder_get_colorspace(t_pdfrasencoder* enc)
 			return pdatomvalue(PDA_DeviceRGB);
 		}
 		else {
-			return pdfr_encoder_get_srgb_colorspace(enc);
+			return pdfr_encoder_get_ICCcolorspace(enc);
 		}
 	case PDFRAS_BITONAL:
 		// "Bitonal images shall be represented by an image XObject dictionary with DeviceGray

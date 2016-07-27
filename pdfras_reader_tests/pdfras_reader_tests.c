@@ -126,14 +126,26 @@ void page_info_tests()
 	ASSERT(16.0 == pdfrasread_page_horizontal_dpi(reader, 4));
 	ASSERT(128.0 == pdfrasread_page_vertical_dpi(reader, 4));
 
-	ASSERT(RASREAD_RGB24 == pdfrasread_page_format(reader, 5));
-	ASSERT(850 == pdfrasread_page_width(reader, 5));
-	ASSERT(1100 == pdfrasread_page_height(reader, 5));
-	ASSERT(180 == pdfrasread_page_rotation(reader, 5));
-	ASSERT(100.0 == pdfrasread_page_horizontal_dpi(reader, 5));
-	ASSERT(100.0 == pdfrasread_page_vertical_dpi(reader, 5));
+    ASSERT(RASREAD_RGB24 == pdfrasread_page_format(reader, 5));
+    ASSERT(850 == pdfrasread_page_width(reader, 5));
+    ASSERT(1100 == pdfrasread_page_height(reader, 5));
+    ASSERT(180 == pdfrasread_page_rotation(reader, 5));
+    ASSERT(100.0 == pdfrasread_page_horizontal_dpi(reader, 5));
+    ASSERT(100.0 == pdfrasread_page_vertical_dpi(reader, 5));
 
-	pdfrasread_destroy(reader);
+	ASSERT(RASREAD_RGB24 == pdfrasread_page_format(reader, 6));
+	ASSERT(175 == pdfrasread_page_width(reader, 6));
+	ASSERT(100 == pdfrasread_page_height(reader, 6));
+	ASSERT(90== pdfrasread_page_rotation(reader, 6));
+	ASSERT(50.0 == pdfrasread_page_horizontal_dpi(reader, 6));
+	ASSERT(50.0 == pdfrasread_page_vertical_dpi(reader, 6));
+
+    // page that doesn't exist:
+    ASSERT(RASREAD_FORMAT_NULL == pdfrasread_page_format(reader, 7));
+    ASSERT(RASREAD_FORMAT_NULL == pdfrasread_page_format(reader, -1));
+    ASSERT(RASREAD_FORMAT_NULL == pdfrasread_page_format(reader, 65535));
+
+    pdfrasread_destroy(reader);
 	printf("passed\n");
 } // page_info_tests
 

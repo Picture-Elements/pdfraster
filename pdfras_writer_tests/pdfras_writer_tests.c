@@ -1496,7 +1496,7 @@ void test_arrays()
 	pd_array_add(arr, pdcstrvalue(pool, "the beautiful moves in curves."));
 	ASSERT(pd_array_count(arr) == 3);
 	ASSERT(pd_array_capacity(arr) == 3);
-	// setting outside bounds should do nothing:
+	// trying to set an element outside bounds should do nothing:
 	pd_array_set(arr, 3, pdintvalue(42));
 	// and should not change count or capacity:
 	ASSERT(pd_array_count(arr) == 3);
