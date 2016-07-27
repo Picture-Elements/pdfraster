@@ -105,6 +105,13 @@ void pdfr_encoder_set_compression(t_pdfrasencoder* enc, RasterCompression comp);
 // devColor=1 for raw/device, devColor=0 for default calibrated colorspace.
 void pdfr_encoder_set_device_colorspace(t_pdfrasencoder* enc, int devColor);
 
+// specify an ICC-profile based colorspace for subsequent RGB images.
+// (By default, RGB images are assumed to be sRGB)
+// profile must point to a valid ICC color profile of len bytes.
+// (the profile is not validated but is used verbatim)
+// If profile is NULL, the standard sRGB profile is used and the len value is ignored.
+void pdfr_encoder_define_rgb_icc_colorspace(t_pdfrasencoder* enc, const pduint8 *profile, size_t len);
+
 // Set the viewing angle for the current page (if any) and subsequent pages.
 // The angle is a rotation clockwise in degrees and must be a multiple of 90.
 // This angle is initially 0.

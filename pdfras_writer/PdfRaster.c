@@ -27,7 +27,7 @@ typedef struct t_pdfrasencoder {
 	t_pdvalue			info;
 	t_pdvalue			trailer;
 	// optional document objects
-	t_pdvalue			iccColorspace;		// current ICCBased colorspace, if any
+	t_pdvalue			rgbColorspace;		// non-device colorspace for RGB images
 	// current page object and related values
 	t_pdvalue			currentPage;
 	double				xdpi;				// horizontal resolution, pixels/inch
@@ -93,7 +93,7 @@ t_pdfrasencoder* pdfr_encoder_create(int apiLevel, t_OS *os)
 		pd_dict_put(enc->info, PDA_CreationDate, pd_make_time_string(pool, enc->creationDate));
 		// we don't modify PDF so there is no ModDate
 
-		assert(IS_NULL(enc->iccColorspace));
+		assert(IS_NULL(enc->rgbColorspace));
 		assert(IS_NULL(enc->currentPage));
 
 		// Write the PDF header:
@@ -186,6 +186,19 @@ void pdfr_encoder_set_device_colorspace(t_pdfrasencoder* enc, int devColor)
 	enc->devColor = (devColor != 0);
 }
 
+void pdfr_encoder_define_rgb_icc_colorspace(t_pdfrasencoder* enc, const pduint8 *profile, size_t len)
+{
+    if (!profile) {
+        enc->rgbColorspace = pd_make_srgb_colorspace(enc->pool, enc->xref);
+    }
+    else {
+        // define the calibrated (ICCBased) colorspace that should
+        // be used on RGB images (if they aren't marked DeviceRGB)
+        enc->rgbColorspace =
+            pd_make_iccbased_rgb_colorspace(enc->pool, enc->xref, profile, len);
+    }
+}
+
 int pdfr_encoder_start_page(t_pdfrasencoder* enc, int width)
 {
 	if (IS_DICT(enc->currentPage)) {
@@ -230,19 +243,19 @@ static void onimagedataready(t_datasink *sink, void *eventcookie)
 	pd_datasink_put(sink, pinfo->data, 0, pinfo->count);
 }
 
-t_pdvalue pdfr_encoder_get_ICCcolorspace(t_pdfrasencoder* enc)
+t_pdvalue pdfr_encoder_get_rgb_colorspace(t_pdfrasencoder* enc)
 {
-    // if there's no current iccColorSpace
-	if (IS_NULL(enc->iccColorspace)) {
-        // create a standard sRGB colorspace (which is a particular
-        // ICC color space
-		t_pdvalue srgb = pd_make_srgb_colorspace(enc->pool, enc->xref);
-		// flush the colorspace profile to the output
-		t_pdvalue profile = pd_array_get(srgb.value.arrvalue, 1);
-		pd_write_reference_declaration(enc->stm, profile);
-		enc->iccColorspace = srgb;
+    // if there's no current calibrated RGB ColorSpace
+	if (IS_NULL(enc->rgbColorspace)) {
+        // define the default calibrated RGB colorspace as
+        // sRGB colorspace:
+        pdfr_encoder_define_rgb_icc_colorspace(enc, NULL, 0);
 	}
-	return enc->iccColorspace;
+    // flush the colorspace profile to the output
+    t_pdvalue profile = pd_array_get(enc->rgbColorspace.value.arrvalue, 1);
+    pd_write_reference_declaration(enc->stm, profile);
+    // return the current calibrated RGB colorspace
+    return enc->rgbColorspace;
 }
 
 t_pdvalue pdfr_encoder_get_calgray_colorspace(t_pdfrasencoder* enc)
@@ -260,12 +273,13 @@ t_pdvalue pdfr_encoder_get_colorspace(t_pdfrasencoder* enc)
 	switch (enc->pixelFormat) {
 	case PDFRAS_RGB24:
 	case PDFRAS_RGB48:
-		// unless told to use device colorspace, use ICC profile colorspace
+		// unless told to use device colorspace, use calibrated colorspace
 		if (enc->devColor) {
 			return pdatomvalue(PDA_DeviceRGB);
 		}
 		else {
-			return pdfr_encoder_get_ICCcolorspace(enc);
+            // retrieve the current calibrated colorspace
+			return pdfr_encoder_get_rgb_colorspace(enc);
 		}
 	case PDFRAS_BITONAL:
 		// "Bitonal images shall be represented by an image XObject dictionary with DeviceGray

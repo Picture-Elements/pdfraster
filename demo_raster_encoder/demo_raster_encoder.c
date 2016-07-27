@@ -608,6 +608,8 @@ int main(int argc, char** argv)
 	os.memset = myMemSet;
 	os.writeout = myOutputWriter;
 
+    printf("demo_raster_encoder\n");
+
 	generate_image_data();
 
 	write_0page_file(os, "sample empty.pdf");
@@ -634,6 +636,9 @@ int main(int argc, char** argv)
 
 	write_allformat_multipage_file(os, "sample all formats.pdf");
 
-	return 0;
+    printf("------------------------------\n");
+    printf("Hit [enter] to exit:\n");
+    getchar();
+    return 0;
 }
 

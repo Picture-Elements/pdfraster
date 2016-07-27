@@ -128,4 +128,9 @@ int main(int argc, char **argv)
 	pd_xref_free(xref);
 	pd_atom_table_free(atoms);
 	pd_alloc_free_pool(os.allocsys);
+
+    printf("------------------------------\n");
+    printf("Hit [enter] to exit:\n");
+    getchar();
+    return 0;
 }
