@@ -868,25 +868,38 @@ static int parse_media_box(t_pdfrasreader* reader, pduint32 *poff, double mediab
 	skip_whitespace(reader, poff);
 	pduint32 off = *poff;
 	if (peekch(reader, off) != '[') {
-		// not a valid array
-		return FALSE;
+        // invalid PDF: bad MediaBox
+        compliance_error(reader, READ_MEDIABOX_ARRAY, off);
+        return FALSE;
 	}
 	// skip over the opening '['
 	if (nextch(reader, &off) < 0) {
-		return FALSE;
+        // invalid PDF: bad MediaBox
+        compliance_error(reader, READ_MEDIABOX_ARRAY, off);
+        return FALSE;
 	}
 	int i;
 	for (i = 0; i < 4; i++) {
 		if (!parse_number_value(reader, &off, &mediabox[i])) {
-			// invalid PDF: MediaBox missing or bad element
-			return FALSE;
+			// invalid PDF: bad MediaBox element
+            compliance_error(reader, READ_MEDIABOX_ELEMENTS, off);
+            return FALSE;
 		}
 	}
 	if (!token_match(reader, &off, "]")) {
 		// invalid PDF: MediaBox array has more than 4 elements
-		return FALSE;
+        compliance_error(reader, READ_MEDIABOX_ARRAY, off);
+        return FALSE;
 	}
-	// normalize rectangle so lower-left corner is actually lower and left etc.
+    if (mediabox[0] != 0 || mediabox[1] != 0) {
+        compliance_error(reader, READ_MEDIABOX_ELEMENTS, off);
+        return FALSE;
+    }
+    if (mediabox[3] < 0 || mediabox[4] < 0) {
+        compliance_error(reader, READ_MEDIABOX_ELEMENTS, off);
+        return FALSE;
+    }
+    // normalize rectangle so lower-left corner is actually lower and left etc.
 	if (mediabox[0] > mediabox[2]) {
 		double t = mediabox[0]; mediabox[0] = mediabox[2]; mediabox[2] = t;
 	}
@@ -1340,11 +1353,14 @@ static int get_page_info(t_pdfrasreader* reader, int p, t_pdfpageinfo* pinfo)
 		pinfo->rotation = angle % 360;
 	}
 	// similarly for mediabox
-	if (!dictionary_lookup(reader, page, "/MediaBox", &val) || !parse_media_box(reader, &val, pinfo->MediaBox)) {
+	if (!dictionary_lookup(reader, page, "/MediaBox", &val)) {
 		compliance_error(reader, READ_PAGE_MEDIABOX, page);
 		return FALSE;
 	}
-	pduint32 resdict;
+    if (!parse_media_box(reader, &val, pinfo->MediaBox)) {
+        return FALSE;
+    }
+    pduint32 resdict;
 	if (!dictionary_lookup(reader, page, "/Resources", &resdict)) {
 		// bad page object, no /Resources entry
 		compliance_error(reader, READ_RESOURCES, page);

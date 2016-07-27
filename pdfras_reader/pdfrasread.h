@@ -131,6 +131,8 @@ typedef enum {
 	READ_PAGE_TYPE,					// page dict must have /Type /Page
 	READ_PAGE_ROTATION,				// page rotation if present must be an inline non-negative multiple of 90.
 	READ_PAGE_MEDIABOX,				// each page dict must have a /MediaBox entry
+    READ_MEDIABOX_ARRAY,            // MediaBox value must be an array
+    READ_MEDIABOX_ELEMENTS,         // MediaBox must contain 4 numbers: [0 0 w h]
 	READ_RESOURCES,					// each page dictionary must have a /Resources entry (that is a dictionary)
 	READ_XOBJECT,					// page resource dictionary must have /XObject entry
 	READ_XOBJECT_DICT,				// XObject has to be a dictionary
