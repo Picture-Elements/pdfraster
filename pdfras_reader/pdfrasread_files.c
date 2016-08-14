@@ -27,7 +27,7 @@ int pdfrasread_recognize_file(FILE* f)
 {
     int bYes = FALSE;
     if (f) {
-		bYes = pdfrasread_recognize_source(file_reader, f);
+		bYes = pdfrasread_recognize_source(file_reader, f, NULL, NULL);
     }
     return bYes;
 }

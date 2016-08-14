@@ -6,6 +6,19 @@
 #include <assert.h>
 #include <limits.h>
 
+#define MIN(a,b) ((a)<(b) ? (a) : (b))
+#define MAX(a,b) ((a)>(b) ? (a) : (b))
+
+///////////////////////////////////////////////////////////////////////
+// Internal Constants
+
+// The highest major version of PDF/raster we can handle
+#define RASREAD_MAX_MAJOR   1
+// the highest minor version of the highest major version, that we can handle
+#define RASREAD_MAX_MINOR   0
+
+#define READER_SIGNATURE 0xD00D
+
 ///////////////////////////////////////////////////////////////////////
 // Data Structures & Types
 
@@ -37,12 +50,15 @@ typedef struct {
 
 // Structure that represents a PDF/raster byte-stream that is open for reading
 typedef struct t_pdfrasreader {
+    int                 sig;                // safety/validity signature
 	int					apiLevel;			// caller's specified API level.
 	pdfras_freader		fread;				// function for reading from source
 	pdfras_fcloser		fclose;				// source closer
+    pdfras_err_handler  error_handler;      // external error-reporting callback
 	pdbool				bOpen;				// whether this reader is open
 	void*				source;				// cookie/handle to caller-defined source
 	pduint32			filesize;			// source size, in bytes
+    int                 major, minor;       // level of PDF/raster claimed by source
 	struct {
 		char			data[1024];
 		pduint32		off;
@@ -57,10 +73,17 @@ typedef struct t_pdfrasreader {
 } t_pdfrasreader;
 
 ///////////////////////////////////////////////////////////////////////
+// Global (gasp!) variables
+
+static pdfras_err_handler global_error_handler = pdfrasread_default_error_handler;
+
+///////////////////////////////////////////////////////////////////////
 // Functions
 
 ///////////////////////////////////////////////////////////////////////
 // Utility Functions
+
+#define VALID(p) ((p)!=NULL && (p)->sig==READER_SIGNATURE)
 
 // Find last occurrence of string in string
 static const char * strrstr(const char * haystack, const char * needle)
@@ -145,35 +168,42 @@ static size_t pdfras_read_tail(pdfras_freader readfn, void* source, char* tail, 
 	return step;
 }
 
-int pdfras_recognize_pdrf_tail(const char* tail)
+int pdfras_parse_pdfr_tag(const char* tag, int* pmajor, int* pminor)
 {
-	const char* p = strrstr(tail, "%PDF-raster-");
-	if (!p) {
+    assert(tag);
+    if (pmajor) *pmajor = 0;
+    if (pminor) *pminor = 0;
+	if (tag[-1] != 0x0D && tag[-1] != 0x0A) {
 		return FALSE;
 	}
-	if (p == tail) {
-		return FALSE;
-	}
-	if (p[-1] != 0x0D && p[-1] != 0x0A) {
-		return FALSE;
-	}
-	p += 12;
-	if (!isdigit(*p)) return FALSE;
-	while (isdigit(*p)) p++;
-	if (*p != '.') return FALSE;
-	p++;
-	if (!isdigit(*p)) return FALSE;
-	while (isdigit(*p)) p++;
-	if (*p == 0x0D) {
-		p++;
-		if (*p == 0x0A) p++;
-	}
-	else if (*p == 0x0A) {
-		p++;
-	}
-	else {
-		return FALSE;
-	}
+	tag += 12;
+    {
+        int major = 0, minor = 0;
+        if (!isdigit(*tag)) return FALSE;
+        while (isdigit(*tag)) {
+            major = major * 10 + (*tag - '0');
+            tag++;
+        }
+        if (*tag != '.') return FALSE;
+        tag++;
+        if (!isdigit(*tag)) return FALSE;
+        while (isdigit(*tag)) {
+            minor = minor * 10 + (*tag - '0');
+            tag++;
+        }
+        if (*tag == 0x0D) {
+            tag++;
+            if (*tag == 0x0A) tag++;
+        }
+        else if (*tag == 0x0A) {
+            tag++;
+        }
+        else {
+            return FALSE;
+        }
+        if (pmajor) *pmajor = major;
+        if (pminor) *pminor = minor;
+    }
 	return TRUE;
 }
 
@@ -202,25 +232,68 @@ int pdfras_recognize_pdf_header(const void* sig)
 	return TRUE;
 }
 
-int pdfrasread_recognize_source(pdfras_freader readfn, void* source)
+int pdfrasread_recognize_source(pdfras_freader readfn, void* source, int* pmajor, int* pminor)
 {
 	char buffer[1024];
+    if (pmajor) *pmajor = -1;
+    if (pminor) *pminor = -1;
 	// check the header, it's quick & easy and we do need
 	// to know that it's some kind of PDF, not just any file
 	if (readfn(source, 0, 32, buffer) != 32) {
 		return FALSE;
 	}
 	if (!pdfras_recognize_pdf_header(buffer)) {
+        // not PDF
 		return FALSE;
 	}
-	pdfras_read_tail(readfn, source, buffer, sizeof buffer - 1);
-	return pdfras_recognize_pdrf_tail(buffer);
+    size_t tailsize = pdfras_read_tail(readfn, source, buffer, sizeof buffer - 1);
+    const char* tag = strrstr(buffer, "%PDF-raster-");
+    if (!tag || tag == buffer) {
+        return FALSE;
+    }
+    {
+        int major = 0, minor = 0;
+        if (!pdfras_parse_pdfr_tag(tag, &major, &minor)) {
+            return FALSE;
+        }
+        if (pmajor) *pmajor = major;
+        if (pminor) *pminor = minor;
+        if (major < 1 || major > RASREAD_MAX_MAJOR) {
+            return FALSE;
+        }
+    }
+    return TRUE;
+}
+
+static void informational(t_pdfrasreader* reader, int code, pduint32 offset)
+{
+    if (VALID(reader)) {
+        reader->error_handler(reader, REPORTING_INFO, code, offset);
+    }
+    else {
+        global_error_handler(NULL, REPORTING_INFO, code, offset);
+    }
+}
+
+static void warning(t_pdfrasreader* reader, int code, pduint32 offset)
+{
+    if (VALID(reader)) {
+        reader->error_handler(reader, REPORTING_WARNING, code, offset);
+    }
+    else {
+        global_error_handler(NULL, REPORTING_WARNING, code, offset);
+    }
 }
 
 // report a failure to comply with the PDF/raster spec, at offset in file
 static void compliance_error(t_pdfrasreader* reader, int code, pduint32 offset)
 {
-	fprintf(stderr, "* COMPLIANCE offset +%06u, code %d\n", offset, code);
+    if (VALID(reader)) {
+        reader->error_handler(reader, REPORTING_COMPLIANCE, code, offset);
+    }
+    else {
+        global_error_handler(NULL, REPORTING_COMPLIANCE, code, offset);
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////
@@ -1193,34 +1266,66 @@ static int build_page_table(t_pdfrasreader* reader, pduint32 root)
 static int parse_trailer(t_pdfrasreader* reader)
 {
 	reader->filesize = pdfras_find_file_size(reader->fread, reader->source);
-	char tail[512+1];
+	char tail[1024+1];
 	size_t tailsize = pdfras_read_tail(reader->fread, reader->source, tail, sizeof tail - 1);
-	if (!pdfras_recognize_pdrf_tail(tail)) {
-		// it doesn't have the PDF-raster marker
+    pduint32 off = reader->filesize - tailsize;
+    const char* eof = strrstr(tail, "%%EOF");
+    if (!eof) {
+        // invalid PDF - %%EOF not found in tail of file.
+        compliance_error(reader, READ_FILE_EOF_MARKER, off);
+        return FALSE;
+    }
+    // we need to find the startxref anyway, let's check now,
+    // it's a good check for a valid PDF.
+    const char* startxref = strrstr(tail, "startxref");
+    if (!startxref) {
+        // invalid PDF - startxref not found in tail of file.
+        compliance_error(reader, READ_FILE_STARTXREF, off);
+        return FALSE;
+    }
+    // find the PDF/raster 'tag'
+    const char* tag = strrstr(tail, "%PDF-raster-");
+    if (!tag || tag == tail) {
+        // PDF/raster marker not found in tail of file
+        compliance_error(reader, READ_FILE_PDFRASTER_TAG, off);
+        return FALSE;
+    }
+    // found the %PDF-raster tag
+    off += tag - tail;
+    if (!pdfras_parse_pdfr_tag(tag, &reader->major, &reader->minor) ||
+        reader->major < 1 ||
+        reader->minor < 0) {
+        compliance_error(reader, READ_FILE_BAD_TAG, off);
 		return FALSE;
 	}
-	pduint32 off = reader->filesize - tailsize;
-	const char* eof = strrstr(tail, "%%EOF");
-	if (!eof) {
-		// invalid PDF - %%EOF not found in last 1024 bytes.
-		return FALSE;
-	}
-	const char* startxref = strrstr(tail, "startxref");
-	if (!startxref) {
-		// invalid PDF - startxref not found in last 1024 bytes.
-		return FALSE;
-	}
+    // point specifically to the x.y part of the tag
+    off += 12;
+    if (reader->major > RASREAD_MAX_MAJOR) {
+        // beyond us, we can't handle it.
+        compliance_error(reader, READ_FILE_TOO_MAJOR, off);
+        return FALSE;
+    }
+    if (reader->major == RASREAD_MAX_MAJOR && reader->minor > RASREAD_MAX_MINOR) {
+        // minor version is above what we understand - supposedly that
+        // means some nonessential new features may not work.
+        warning(reader, READ_FILE_TOO_MINOR, off);
+        return FALSE;
+    }
+    // go back to the whole tail thing for a sec...
+    off = reader->filesize - tailsize;
 	// Calculate the file position of the "startxref" keyword
 	// and make a note of it for a bit later.
 	pduint32 startxref_off = off += (startxref - tail);
 	unsigned long xref_off;
 	if (!token_match(reader, &off, "startxref") || !token_ulong(reader, &off, &xref_off)) {
 		// startxref not followed by unsigned int
+        compliance_error(reader, READ_FILE_BAD_STARTXREF, off);
 		return FALSE;
 	}
 	if (xref_off < 16 || xref_off >= reader->filesize) {
 		// invalid PDF - offset to xref table is bogus
-		return FALSE;
+        compliance_error(reader, READ_FILE_BAD_STARTXREF, off);
+        return FALSE;
 	}
 	// go there and read the xref table
 	off = xref_off;
@@ -1575,10 +1680,15 @@ static int find_strip(t_pdfrasreader* reader, int p, int s, pduint32* pstrip)
 	return TRUE;
 }
 
-// Read the raw (compressed) data of strip s on page p into buffer
+// Read the raw (compressed) data of strip s on page p into buffer, not more than bufsize bytes.
 // Returns the actual number of bytes read.
+// A return value of 0 indicates an error.
 size_t pdfrasread_read_raw_strip(t_pdfrasreader* reader, int p, int s, void* buffer, size_t bufsize)
 {
+    if (!VALID(reader)) {
+        global_error_handler(NULL, REPORTING_API, READ_API_BAD_READER, __LINE__);
+        return 0;
+    }
 	// find the strip
 	pduint32 strip;
 	if (!find_strip(reader, p, s, &strip)) {
@@ -1603,6 +1713,39 @@ size_t pdfrasread_read_raw_strip(t_pdfrasreader* reader, int p, int s, void* buf
 	return length;
 }
 
+int pdfrasread_default_error_handler(t_pdfrasreader* reader, int level, int code, pduint32 offset)
+{
+    const char* levelName[] = {
+        "INFORMATIONAL",        // useful to know but not bad news.
+        "WARNING",              // a potential problem - but execution can continue.
+        "COMPLIANCE",           // a violation of the PDF/raster specification was detected.
+        "INV API CALL",		    // an invalid request was made to this API.
+        "MEMORY ALLOC",		    // memory allocation failed.
+        "I/O ERROR",		    // low-level read or write failed unexpectedly.
+        "INTERNAL LIMIT",		// a built-in limitation of this library was exceeded.
+        "INTERNAL ERROR",	    // an 'impossible' internal state has been detected.
+        "OTHER FATAL"		    // none of the above, current API call fails.
+    };
+    char marker = '*';      // for errors
+    if (level == REPORTING_INFO) {
+        marker = '-';
+    }
+    else if (level == REPORTING_WARNING) {
+        marker = '?';
+    }
+    assert(level >= REPORTING_INFO);
+    assert(level <= REPORTING_OTHER);
+    level = MAX(REPORTING_INFO, MIN(REPORTING_OTHER, level));
+    fprintf(stderr, "%c %13s  offset +%06u, code %d\n", marker, levelName[level], offset, code);
+    return 0;
+}
+
+// internal function that just passes an error through the (settable) global error handler.
+static int call_global_error_handler(t_pdfrasreader* reader, int level, int code, pduint32 offset)
+{
+    return global_error_handler(reader, level, code, offset);
+}
+
 ///////////////////////////////////////////////////////////////////////
 // Top-Level Public Functions
 
@@ -1611,77 +1754,130 @@ t_pdfrasreader* pdfrasread_create(int apiLevel, pdfras_freader readfn, pdfras_fc
 {
 	if (apiLevel < 1) {
 		// error, invalid parameter value
-		return NULL;
+        global_error_handler(NULL, REPORTING_API, READ_API_APILEVEL, (pduint32)apiLevel);
+        return NULL;
 	}
 	if (apiLevel > RASREAD_API_LEVEL) {
 		// error, caller expects a future version of this API
-		return NULL;
+        global_error_handler(NULL, REPORTING_API, READ_API_APILEVEL, (pduint32)apiLevel);
+        return NULL;
 	}
 	// some internal consistency checks
 	if (20 != sizeof(t_xref_entry)) {
 		// compilation/build error: xref entry is not exactly 20 bytes.
-		return NULL;
+        global_error_handler(NULL, REPORTING_INTERNAL, READ_INTERNAL_XREF_SIZE, sizeof(t_xref_entry));
+        return NULL;
 	}
 	t_pdfrasreader* reader = (t_pdfrasreader*)malloc(sizeof(t_pdfrasreader));
-	if (reader) {
-		memset(reader, 0, sizeof *reader);
-		reader->apiLevel = apiLevel;
-		reader->fread = readfn;
-		reader->fclose = closefn;
-		reader->page_count = -1;		// Unknown
-	}
+    if (!reader) {
+        global_error_handler(NULL, REPORTING_MEMORY, READ_MEMORY_MALLOC, sizeof(t_xref_entry));
+        return NULL;
+    }
+    memset(reader, 0, sizeof *reader);
+    reader->sig = READER_SIGNATURE;
+    reader->apiLevel = apiLevel;
+    reader->fread = readfn;
+    reader->fclose = closefn;
+    reader->error_handler = call_global_error_handler;
+    reader->page_count = -1;		// Unknown
+    assert(VALID(reader));
 	return reader;
 }
 
 void pdfrasread_destroy(t_pdfrasreader* reader)
 {
-	if (reader) {
+    if (!VALID(reader)) {
+        global_error_handler(NULL, REPORTING_API, READ_API_BAD_READER, __LINE__);
+    } else {
 		if (reader->page_table) {
 			free(reader->page_table);
 		}
 		if (reader->xrefs) {
 			free(reader->xrefs);
 		}
+        reader->sig = 0xDEAD;
 		free(reader);
 	}
 }
 
+void pdfrasread_set_error_handler(t_pdfrasreader* reader, pdfras_err_handler errhandler)
+{
+    if (!VALID(reader)) {
+        global_error_handler(NULL, REPORTING_API, READ_API_BAD_READER, __LINE__);
+    } else {
+        if (!errhandler) {
+            errhandler = call_global_error_handler;
+        }
+        reader->error_handler = errhandler;
+    }
+}
+
+void pdfrasread_set_global_error_handler(pdfras_err_handler errhandler)
+{
+    if (!errhandler) {
+        errhandler = pdfrasread_default_error_handler;
+    }
+    global_error_handler = errhandler;
+}
+
+
+void pdfrasread_get_highest_pdfr_version(t_pdfrasreader* reader, int* pmajor, int* pminor)
+{
+    if (pmajor) *pmajor = RASREAD_MAX_MAJOR;
+    if (pminor) *pminor = RASREAD_MAX_MINOR;
+}
+
 int pdfrasread_open(t_pdfrasreader* reader, void* source)
 {
+    if (!VALID(reader)) {
+        global_error_handler(NULL, REPORTING_API, READ_API_BAD_READER, __LINE__);
+        return FALSE;
+    }
 	if (reader->bOpen) {
+        // already open, can't open it.
 		return FALSE;
 	}
 	reader->source = source;
-	if (parse_trailer(reader)) {
-		reader->bOpen = PD_TRUE;
+	if (!parse_trailer(reader)) {
+        // not a valid PDF/raster file
+		reader->source = NULL;
 	}
 	else {
-		reader->source = NULL;
+		reader->bOpen = PD_TRUE;
 	}
 	return reader->bOpen;
 }
 
 void* pdfrasread_source(t_pdfrasreader* reader)
 {
-	if (reader) {
-		return reader->source;
-	}
-	return NULL;
+    if (!VALID(reader)) {
+        global_error_handler(NULL, REPORTING_API, READ_API_BAD_READER, __LINE__);
+        return NULL;
+    }
+    return reader->source;
 }
 
 int pdfrasread_is_open(t_pdfrasreader* reader)
 {
-	return reader && reader->bOpen;
+    if (!VALID(reader)) {
+        global_error_handler(NULL, REPORTING_API, READ_API_BAD_READER, __LINE__);
+        return FALSE;
+    }
+	return reader->bOpen;
 }
 
 int pdfrasread_close(t_pdfrasreader* reader)
 {
-	if (reader && reader->bOpen) {
-		if (reader->fclose) {
-			reader->fclose(reader->source);
-		}
-		reader->bOpen = PD_FALSE;
-		return TRUE;
-	}
-	return FALSE;
+    if (!VALID(reader)) {
+        global_error_handler(NULL, REPORTING_API, READ_API_BAD_READER, __LINE__);
+        return FALSE;
+    }
+    if (!reader->bOpen) {
+        return FALSE;
+    }
+    if (reader->fclose) {
+        reader->fclose(reader->source);
+    }
+    reader->bOpen = PD_FALSE;
+    return TRUE;
 }
