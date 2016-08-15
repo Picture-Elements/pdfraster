@@ -18,15 +18,6 @@ extern "C" {
 
 #define RASREAD_API_LEVEL	1
 
-#define PDFRASREAD_VERSION "0.5"
-// 0.5  spike   2016.08.13  pdfrasread_recognize_source reports PDF/raster version
-//                          new - error handling API.
-// 0.4	spike	2016.07.21	first formal reporting of compliance failures
-//							reader test fails down to 27.
-// 0.3	spike	2016.07.19	minor API and internal improvements
-// 0.2	spike	2016.07.13	revised PDF-raster marker in trailer dict.
-// 0.1	spike	2015.02.11	1st version
-
 // Pixel Formats
 typedef enum {
 	RASREAD_FORMAT_NULL,		// null value
@@ -75,6 +66,13 @@ t_pdfrasreader* pdfrasread_create(int apiLevel, pdfras_freader readfn, pdfras_fc
 // Destroy the reader and release all associated resources.
 // If open, closes it (and calls the closefn (and ignores any error)).
 void pdfrasread_destroy(t_pdfrasreader* reader);
+
+// Return the version of this library, as a string
+// of the form a.b.c.d (config)
+// where a.b.c.d is a conventional 4-field version number,
+// and config is the word DEBUG or RELEASE, possibly followed by
+// some kind of platform description like WIN32/x86
+const char* pdfrasread_lib_version(void);
 
 // Set the global error handler for this library.
 // There is just one shared global error handler for each instance of the library.

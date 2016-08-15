@@ -12,12 +12,30 @@
 ///////////////////////////////////////////////////////////////////////
 // Internal Constants
 
+#define PDFRASREAD_VERSION "0.6.0.0"
+// 0.6.0.0  spike   2016.08.14  moved this history inside the library
+//                              went to a.b.c.d version
+//                              added: pdfrasread_lib_version()
+// 0.5  spike   2016.08.13  pdfrasread_recognize_source reports PDF/raster version
+//                          new - error handling API.
+// 0.4  spike	2016.07.21	first formal reporting of compliance failures
+//							reader test fails down to 27.
+// 0.3  spike	2016.07.19	minor API and internal improvements
+// 0.2  spike	2016.07.13	revised PDF-raster marker in trailer dict.
+// 0.1  spike	2015.02.11	1st version
+
 // The highest major version of PDF/raster we can handle
 #define RASREAD_MAX_MAJOR   1
 // the highest minor version of the highest major version, that we can handle
 #define RASREAD_MAX_MINOR   0
 
 #define READER_SIGNATURE 0xD00D
+
+#ifdef _DEBUG
+#define CONFIGURATION "DEBUG"
+#else
+#define CONFIGURATION "RELEASE"
+#endif
 
 ///////////////////////////////////////////////////////////////////////
 // Data Structures & Types
@@ -29,7 +47,7 @@ typedef struct t_xref_entry {
 	char		offset[10];					// 10-digit byte offset
 	char		gen[6];						// space + 5-digit generation number
 	char		status[2];					// " n" (in use) or " f" (free)
-	char		eol[2];
+	char		eol[2];                     // either <space>LF or CR,LF
 } t_xref_entry;
 
 // All the information about a single page and the image it contains
@@ -96,37 +114,6 @@ static const char * strrstr(const char * haystack, const char * needle)
 static unsigned long ulmax(unsigned long a, unsigned long b)
 {
 	return (a >= b) ? a : b;
-}
-
-// Read the next buffer-full into the buffer, or up to EOF.
-// Append a NUL.
-// Set *poff to the offset in the file of the first byte in the buffer.
-// If nothing read (at EOF) return FALSE, otherwise return TRUE.
-static int advance_buffer(t_pdfrasreader* reader, pduint32* poff)
-{
-	// Compute file position of next byte after current buffer:
-	*poff = reader->buffer.off + reader->buffer.len;
-	// Read into buffer as much as will fit (with trailing NUL) or up to EOF:
-	reader->buffer.len = reader->fread(reader->source, *poff, sizeof reader->buffer.data - 1, reader->buffer.data);
-	// NUL-terminate the buffer
-	reader->buffer.data[reader->buffer.len] = 0;
-	// TRUE if something was read, FALSE if nothing read (presumably EOF)
-	return reader->buffer.len != 0;
-}
-
-static int seek_to(t_pdfrasreader* reader, pduint32 off)
-{
-	if (off < reader->buffer.off || off >= reader->buffer.off + reader->buffer.len) {
-		reader->buffer.off = off;
-		reader->buffer.len = 0;
-		if (!advance_buffer(reader, &off)) {
-			assert(off = reader->buffer.off + reader->buffer.len);
-			return FALSE;
-		}
-	}
-	assert(off >= reader->buffer.off);
-	assert(off < reader->buffer.off + reader->buffer.len);
-	return TRUE;
 }
 
 // Utility functions, do not require a reader object
@@ -295,6 +282,40 @@ static void compliance_error(t_pdfrasreader* reader, int code, pduint32 offset)
         global_error_handler(NULL, REPORTING_COMPLIANCE, code, offset);
     }
 }
+
+// Low-level I/O functions
+
+// Read the next buffer-full into the buffer, or up to EOF.
+// Append a NUL.
+// Set *poff to the offset in the file of the first byte in the buffer.
+// If nothing read (at EOF) return FALSE, otherwise return TRUE.
+static int advance_buffer(t_pdfrasreader* reader, pduint32* poff)
+{
+    // Compute file position of next byte after current buffer:
+    *poff = reader->buffer.off + reader->buffer.len;
+    // Read into buffer as much as will fit (with trailing NUL) or up to EOF:
+    reader->buffer.len = reader->fread(reader->source, *poff, sizeof reader->buffer.data - 1, reader->buffer.data);
+    // NUL-terminate the buffer
+    reader->buffer.data[reader->buffer.len] = 0;
+    // TRUE if something was read, FALSE if nothing read (presumably EOF)
+    return reader->buffer.len != 0;
+}
+
+static int seek_to(t_pdfrasreader* reader, pduint32 off)
+{
+    if (off < reader->buffer.off || off >= reader->buffer.off + reader->buffer.len) {
+        reader->buffer.off = off;
+        reader->buffer.len = 0;
+        if (!advance_buffer(reader, &off)) {
+            assert(off = reader->buffer.off + reader->buffer.len);
+            return FALSE;
+        }
+    }
+    assert(off >= reader->buffer.off);
+    assert(off < reader->buffer.off + reader->buffer.len);
+    return TRUE;
+}
+
 
 ///////////////////////////////////////////////////////////////////////
 // Single-character scanning methods
@@ -1095,7 +1116,7 @@ static int validate_xref_table(t_xref_entry* xrefs, unsigned long numxrefs)
 		if (offend != xrefs[e].gen ||
 			genend != xrefs[e].status ||
 			(xrefs[e].eol[0] != ' ' && xrefs[e].eol[0] != 0x0D) ||
-			(xrefs[e].eol[1] != 0x0D && xrefs[e].eol[1] != 0x0A) ||
+			(xrefs[e].eol[0] != 0x0D && xrefs[e].eol[1] != 0x0A) ||
 			xrefs[e].gen[0] != ' ' ||
 			xrefs[e].status[0] != ' ' ||
 			(xrefs[e].status[1] != 'n' && xrefs[e].status[1] != 'f')) {
@@ -1375,21 +1396,6 @@ static int parse_trailer(t_pdfrasreader* reader)
 	return TRUE;
 }
 
-// Return the number of pages in the associated PDF/raster file
-// -1 in case of error.
-int pdfrasread_page_count(t_pdfrasreader* reader)
-{
-	if (!reader) {
-		return -1;
-	}
-	if (!reader->xrefs) {
-		if (!parse_trailer(reader)) {
-			return -1;
-		}
-	}
-	return reader->page_count;
-}
-
 static pduint32 get_page_pos(t_pdfrasreader* reader, int n)
 {
 	assert(reader);
@@ -1571,173 +1577,33 @@ static int get_page_info(t_pdfrasreader* reader, int p, t_pdfpageinfo* pinfo)
 	return TRUE;
 }
 
-// Return the pixel format of the raster image of page n (indexed from 0)
-RasterPixelFormat pdfrasread_page_format(t_pdfrasreader* reader, int n)
-{
-	t_pdfpageinfo info;
-	if (!get_page_info(reader, n, &info)) {
-		return RASREAD_FORMAT_NULL;
-	}
-	return info.format;
-}
-
-// Return the pixel width of the raster image of page n
-int pdfrasread_page_width(t_pdfrasreader* reader, int n)
-{
-	t_pdfpageinfo info;
-	if (!get_page_info(reader, n, &info)) {
-		return 0;
-	}
-	return info.width;
-}
-
-// Return the pixel height of the raster image of page n
-int pdfrasread_page_height(t_pdfrasreader* reader, int n)
-{
-	t_pdfpageinfo info;
-	if (!get_page_info(reader, n, &info)) {
-		return 0;
-	}
-	return info.height;
-}
-
-// Return the clockwise rotation in degrees to be applied to page n
-int pdfrasread_page_rotation(t_pdfrasreader* reader, int n)
-{
-	t_pdfpageinfo info;
-	if (!get_page_info(reader, n, &info)) {
-		return 0;
-	}
-	return info.rotation;
-}
-
-// Get the resolution in dpi of the raster image of page n
-double pdfrasread_page_horizontal_dpi(t_pdfrasreader* reader, int n)
-{
-	t_pdfpageinfo info;
-	if (!get_page_info(reader, n, &info)) {
-		return 0.0;
-	}
-	return info.xdpi;
-}
-
-double pdfrasread_page_vertical_dpi(t_pdfrasreader* reader, int n)
-{
-	t_pdfpageinfo info;
-	if (!get_page_info(reader, n, &info)) {
-		return 0.0;
-	}
-	return info.ydpi;
-}
-
-// Strip reading functions
-// Return the number of strips in page p
-int pdfrasread_strip_count(t_pdfrasreader* reader, int p)
-{
-	t_pdfpageinfo info;
-	if (!get_page_info(reader, p, &info)) {
-		return 0;
-	}
-	return info.strip_count;
-}
-
-// Return the maximum raw (compressed) strip size on page p
-size_t pdfrasread_max_strip_size(t_pdfrasreader* reader, int p)
-{
-	t_pdfpageinfo info;
-	if (!get_page_info(reader, p, &info)) {
-		return 0;
-	}
-	return info.max_strip_size;
-}
-
 static int find_strip(t_pdfrasreader* reader, int p, int s, pduint32* pstrip)
 {
-	char stripname[32];
+    char stripname[32];
 
-	sprintf(stripname, "/strip%d", s);
+    sprintf(stripname, "/strip%d", s);
 
-	// look up the file position of the nth page object:
-	pduint32 page = get_page_pos(reader, p);
-	if (!page) {
-		return FALSE;
-	}
-	pduint32 resdict;
-	if (!dictionary_lookup(reader, page, "/Resources", &resdict)) {
-		// bad page object, no /Resources entry
-		return FALSE;
-	}
-	// In the Resources dictionary find the XObject dictionary
-	pduint32 xobjects;
-	if (!dictionary_lookup(reader, resdict, "/XObject", &xobjects)) {
-		// bad resource dictionary, no /XObject entry
-		return FALSE;
-	}
-	if (!dictionary_lookup(reader, xobjects, stripname, pstrip)) {
-		// strip not found in XObject dictionary
-		return FALSE;
-	}
-	return TRUE;
-}
-
-// Read the raw (compressed) data of strip s on page p into buffer, not more than bufsize bytes.
-// Returns the actual number of bytes read.
-// A return value of 0 indicates an error.
-size_t pdfrasread_read_raw_strip(t_pdfrasreader* reader, int p, int s, void* buffer, size_t bufsize)
-{
-    if (!VALID(reader)) {
-        global_error_handler(NULL, REPORTING_API, READ_API_BAD_READER, __LINE__);
-        return 0;
+    // look up the file position of the nth page object:
+    pduint32 page = get_page_pos(reader, p);
+    if (!page) {
+        return FALSE;
     }
-	// find the strip
-	pduint32 strip;
-	if (!find_strip(reader, p, s, &strip)) {
-		// invalid strip request
-		return 0;
-	}
-	// Parse the strip stream and find the position & length of its data
-	pduint32 pos;
-	long length;
-	if (!parse_dictionary_or_stream(reader, &strip, &pos, &length) || pos == 0 || length == 0) {
-		// strip stream not found or invalid
-		return 0;
-	}
-	if ((unsigned)length > bufsize) {
-		// invalid strip request, strip does not fit in buffer
-		return 0;
-	}
-	if (reader->fread(reader->source, pos, length, buffer) != length) {
-		// read error, unable to read all of strip data
-		return 0;
-	}
-	return length;
-}
-
-int pdfrasread_default_error_handler(t_pdfrasreader* reader, int level, int code, pduint32 offset)
-{
-    const char* levelName[] = {
-        "INFORMATIONAL",        // useful to know but not bad news.
-        "WARNING",              // a potential problem - but execution can continue.
-        "COMPLIANCE",           // a violation of the PDF/raster specification was detected.
-        "INV API CALL",		    // an invalid request was made to this API.
-        "MEMORY ALLOC",		    // memory allocation failed.
-        "I/O ERROR",		    // low-level read or write failed unexpectedly.
-        "INTERNAL LIMIT",		// a built-in limitation of this library was exceeded.
-        "INTERNAL ERROR",	    // an 'impossible' internal state has been detected.
-        "OTHER FATAL"		    // none of the above, current API call fails.
-    };
-    char marker = '*';      // for errors
-    if (level == REPORTING_INFO) {
-        marker = '-';
+    pduint32 resdict;
+    if (!dictionary_lookup(reader, page, "/Resources", &resdict)) {
+        // bad page object, no /Resources entry
+        return FALSE;
     }
-    else if (level == REPORTING_WARNING) {
-        marker = '?';
+    // In the Resources dictionary find the XObject dictionary
+    pduint32 xobjects;
+    if (!dictionary_lookup(reader, resdict, "/XObject", &xobjects)) {
+        // bad resource dictionary, no /XObject entry
+        return FALSE;
     }
-    assert(level >= REPORTING_INFO);
-    assert(level <= REPORTING_OTHER);
-    level = MAX(REPORTING_INFO, MIN(REPORTING_OTHER, level));
-    fprintf(stderr, "%c %13s  offset +%06u, code %d\n", marker, levelName[level], offset, code);
-    return 0;
+    if (!dictionary_lookup(reader, xobjects, stripname, pstrip)) {
+        // strip not found in XObject dictionary
+        return FALSE;
+    }
+    return TRUE;
 }
 
 // internal function that just passes an error through the (settable) global error handler.
@@ -1799,6 +1665,168 @@ void pdfrasread_destroy(t_pdfrasreader* reader)
 		free(reader);
 	}
 }
+
+const char* pdfrasread_lib_version(void)
+{
+    return PDFRASREAD_VERSION " (" CONFIGURATION ") ";
+}
+
+// Return the number of pages in the associated PDF/raster file
+// -1 in case of error.
+int pdfrasread_page_count(t_pdfrasreader* reader)
+{
+    if (!VALID(reader)) {
+        global_error_handler(NULL, REPORTING_API, READ_API_BAD_READER, __LINE__);
+        return -1;
+    }
+    if (!reader->xrefs) {
+        if (!parse_trailer(reader)) {
+            return -1;
+        }
+    }
+    return reader->page_count;
+}
+
+// Return the pixel format of the raster image of page n (indexed from 0)
+RasterPixelFormat pdfrasread_page_format(t_pdfrasreader* reader, int n)
+{
+    t_pdfpageinfo info;
+    if (!get_page_info(reader, n, &info)) {
+        return RASREAD_FORMAT_NULL;
+    }
+    return info.format;
+}
+
+// Return the pixel width of the raster image of page n
+int pdfrasread_page_width(t_pdfrasreader* reader, int n)
+{
+    t_pdfpageinfo info;
+    if (!get_page_info(reader, n, &info)) {
+        return 0;
+    }
+    return info.width;
+}
+
+// Return the pixel height of the raster image of page n
+int pdfrasread_page_height(t_pdfrasreader* reader, int n)
+{
+    t_pdfpageinfo info;
+    if (!get_page_info(reader, n, &info)) {
+        return 0;
+    }
+    return info.height;
+}
+
+// Return the clockwise rotation in degrees to be applied to page n
+int pdfrasread_page_rotation(t_pdfrasreader* reader, int n)
+{
+    t_pdfpageinfo info;
+    if (!get_page_info(reader, n, &info)) {
+        return 0;
+    }
+    return info.rotation;
+}
+
+// Get the resolution in dpi of the raster image of page n
+double pdfrasread_page_horizontal_dpi(t_pdfrasreader* reader, int n)
+{
+    t_pdfpageinfo info;
+    if (!get_page_info(reader, n, &info)) {
+        return 0.0;
+    }
+    return info.xdpi;
+}
+
+double pdfrasread_page_vertical_dpi(t_pdfrasreader* reader, int n)
+{
+    t_pdfpageinfo info;
+    if (!get_page_info(reader, n, &info)) {
+        return 0.0;
+    }
+    return info.ydpi;
+}
+
+// Strip reading functions
+// Return the number of strips in page p
+int pdfrasread_strip_count(t_pdfrasreader* reader, int p)
+{
+    t_pdfpageinfo info;
+    if (!get_page_info(reader, p, &info)) {
+        return 0;
+    }
+    return info.strip_count;
+}
+
+// Return the maximum raw (compressed) strip size on page p
+size_t pdfrasread_max_strip_size(t_pdfrasreader* reader, int p)
+{
+    t_pdfpageinfo info;
+    if (!get_page_info(reader, p, &info)) {
+        return 0;
+    }
+    return info.max_strip_size;
+}
+
+// Read the raw (compressed) data of strip s on page p into buffer, not more than bufsize bytes.
+// Returns the actual number of bytes read.
+// A return value of 0 indicates an error.
+size_t pdfrasread_read_raw_strip(t_pdfrasreader* reader, int p, int s, void* buffer, size_t bufsize)
+{
+    if (!VALID(reader)) {
+        global_error_handler(NULL, REPORTING_API, READ_API_BAD_READER, __LINE__);
+        return 0;
+    }
+    // find the strip
+    pduint32 strip;
+    if (!find_strip(reader, p, s, &strip)) {
+        // invalid strip request
+        return 0;
+    }
+    // Parse the strip stream and find the position & length of its data
+    pduint32 pos;
+    long length;
+    if (!parse_dictionary_or_stream(reader, &strip, &pos, &length) || pos == 0 || length == 0) {
+        // strip stream not found or invalid
+        return 0;
+    }
+    if ((unsigned)length > bufsize) {
+        // invalid strip request, strip does not fit in buffer
+        return 0;
+    }
+    if (reader->fread(reader->source, pos, length, buffer) != length) {
+        // read error, unable to read all of strip data
+        return 0;
+    }
+    return length;
+}
+
+int pdfrasread_default_error_handler(t_pdfrasreader* reader, int level, int code, pduint32 offset)
+{
+    const char* levelName[] = {
+        "INFORMATIONAL",        // useful to know but not bad news.
+        "WARNING",              // a potential problem - but execution can continue.
+        "COMPLIANCE",           // a violation of the PDF/raster specification was detected.
+        "INV API CALL",		    // an invalid request was made to this API.
+        "MEMORY ALLOC",		    // memory allocation failed.
+        "I/O ERROR",		    // low-level read or write failed unexpectedly.
+        "INTERNAL LIMIT",		// a built-in limitation of this library was exceeded.
+        "INTERNAL ERROR",	    // an 'impossible' internal state has been detected.
+        "OTHER FATAL"		    // none of the above, current API call fails.
+    };
+    char marker = '*';      // for errors
+    if (level == REPORTING_INFO) {
+        marker = '-';
+    }
+    else if (level == REPORTING_WARNING) {
+        marker = '?';
+    }
+    assert(level >= REPORTING_INFO);
+    assert(level <= REPORTING_OTHER);
+    level = MAX(REPORTING_INFO, MIN(REPORTING_OTHER, level));
+    fprintf(stderr, "%c %13s  offset +%06u, code %d\n", marker, levelName[level], offset, code);
+    return 0;
+}
+
 
 void pdfrasread_set_error_handler(t_pdfrasreader* reader, pdfras_err_handler errhandler)
 {

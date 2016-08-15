@@ -35,5 +35,14 @@
     <None Include="badsig2.pdf">
       <Filter>Sample Files</Filter>
     </None>
+    <None Include="sample all formats.pdf">
+      <Filter>Sample Files</Filter>
+    </None>
+    <None Include="missing_eofcomment.pdf">
+      <Filter>Sample Files</Filter>
+    </None>
+    <None Include="0pages.pdf">
+      <Filter>Sample Files</Filter>
+    </None>
   </ItemGroup>
 </Project>

@@ -82,12 +82,17 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\common\test_support.c" />
-    <ClCompile Include="pdfras_reader_tests.c" />
+    <ClCompile Include="pdfras_reader_tests.c">
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4996</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4996</DisableSpecificWarnings>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <None Include="0pages.pdf" />
     <None Include="bad_trailer1.pdf" />
     <None Include="badsig1.pdf" />
     <None Include="badsig2.pdf" />
+    <None Include="missing_eofcomment.pdf" />
     <None Include="sample all formats.pdf" />
     <None Include="valid1.pdf" />
   </ItemGroup>

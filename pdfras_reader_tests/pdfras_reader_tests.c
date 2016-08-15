@@ -3,6 +3,7 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include "pdfrasread_files.h"
 #ifdef WIN32
 #include <direct.h>
@@ -12,6 +13,21 @@
 #endif
 
 #include "test_support.h"
+
+void lib_info_tests()
+{
+    printf("--lib info\n");
+    const char* version = pdfrasread_lib_version();
+    ASSERT(version != NULL);
+    int a, b, c, d;
+    char config[128];
+    ASSERT(sscanf(version, "%u.%u.%u.%u %s", &a, &b, &c, &d, &config) == 5);
+    ASSERT(a == 0);
+    ASSERT(b > 0);
+    ASSERT(b < 10);
+    ASSERT(0 == strcmp(config, "(DEBUG)") ||
+        0 == strcmp(config, "(RELEASE)"));
+}
 
 void signature_tests()
 {
@@ -30,9 +46,12 @@ void signature_tests()
 static size_t freader(void *source, pduint32 offset, size_t length, char *buffer)
 {
 	FILE* f = (FILE*)source;
-	if (0 != fseek(f, offset, SEEK_SET)) {
-		return 0;
-	}
+    if (offset != ftell(f)) {
+        if (0 != fseek(f, offset, SEEK_SET)) {
+            // seek failed, so no read at all:
+            return 0;
+        }
+    }
 	return fread(buffer, sizeof(pduint8), length, f);
 }
 
@@ -59,6 +78,30 @@ void create_destroy_tests()
 
 	pdfrasread_destroy(reader);
 	printf("passed\n");
+}
+
+void open_close_tests()
+{
+    printf("-- reader open/close tests --\n");
+    t_pdfrasreader* reader = pdfrasread_create(RASREAD_API_LEVEL, &freader, &fcloser);
+    ASSERT(reader != NULL);
+    // test that we can open a valid PDF/raster file example
+    // note the "b" mode, it's essential!
+    FILE* f = fopen("valid1.pdf", "rb");
+    ASSERT(f != NULL);
+    // open should succeed
+    ASSERT(pdfrasread_open(reader, f) == TRUE);
+    // after which the reader should be 'open'
+    ASSERT(pdfrasread_is_open(reader) == TRUE);
+    // we can count pages
+    ASSERT(pdfrasread_page_count(reader) == 1);
+    // closing this open reader should succeed
+    ASSERT(pdfrasread_close(reader) == TRUE);
+    // after which the reader should be 'closed'
+    ASSERT(pdfrasread_is_open(reader) == FALSE);
+    // clean up
+    pdfrasread_destroy(reader);
+    printf("passed\n");
 }
 
 static int ignore_compliance_errors(t_pdfrasreader* reader, int level, int code, pduint32 offset)
@@ -196,8 +239,10 @@ int main(int argc, char* argv[])
 	char* cwd = getcwd(NULL, 0);
 	printf("cwd: %s\n", cwd);
 	free(cwd);
+    lib_info_tests();
 	signature_tests();
 	create_destroy_tests();
+    open_close_tests();
 	page_count_tests();
 	page_info_tests();
 	strip_data_tests();
