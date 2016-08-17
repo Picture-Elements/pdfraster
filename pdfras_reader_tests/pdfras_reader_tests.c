@@ -37,6 +37,7 @@ void signature_tests()
 	ASSERT(0 == pdfrasread_recognize_filename("exists.not"));
 	ASSERT(0 == pdfrasread_recognize_filename("badsig1.pdf"));
 	ASSERT(0 == pdfrasread_recognize_filename("badsig2.pdf"));
+    ASSERT(0 == pdfrasread_recognize_filename("missing_eofcomment.pdf"));
 	ASSERT(1 == pdfrasread_recognize_filename("valid1.pdf"));
 	// valid PDF but without PDF/raster signature:
 	ASSERT(0 == pdfrasread_recognize_filename("butnotraster.pdf"));
@@ -72,15 +73,16 @@ static void fcloser(void* source)
 
 void create_destroy_tests()
 {
+    // TODO: test that destroy calls close, and proceeds in the face of close error(s)
 	printf("-- reader create/destroy tests --\n");
 	t_pdfrasreader* reader = pdfrasread_create(RASREAD_API_LEVEL, &freader, &fsizer, &fcloser);
 	ASSERT(reader != NULL);
 	// a freshly created reader is not open:
 	ASSERT(!pdfrasread_is_open(reader));
-	// closing a reader that is not open does nothing and returns FALSE:
-	ASSERT(pdfrasread_close(reader) == FALSE);
 	// the source of a newly created reader is 0 (NULL)
 	ASSERT(pdfrasread_source(reader) == NULL);
+	// closing a reader that is not open does nothing and returns TRUE:
+	ASSERT(pdfrasread_close(reader) == TRUE);
 
 	pdfrasread_destroy(reader);
 	printf("passed\n");
@@ -91,6 +93,8 @@ void open_close_tests()
     printf("-- reader open/close tests --\n");
     t_pdfrasreader* reader = pdfrasread_create(RASREAD_API_LEVEL, &freader, &fsizer, &fcloser);
     ASSERT(reader != NULL);
+    // closing a not-open reader is a successful no-op:
+    ASSERT(pdfrasread_close(reader) == TRUE);
     // test that we can open a valid PDF/raster file example
     // note the "b" mode, it's essential!
     FILE* f = fopen("valid1.pdf", "rb");
@@ -99,12 +103,18 @@ void open_close_tests()
     ASSERT(pdfrasread_open(reader, f) == TRUE);
     // after which the reader should be 'open'
     ASSERT(pdfrasread_is_open(reader) == TRUE);
+    // f should now be the source for this reader:
+    ASSERT(pdfrasread_source(reader) == f);
     // we can count pages
     ASSERT(pdfrasread_page_count(reader) == 1);
     // closing this open reader should succeed
     ASSERT(pdfrasread_close(reader) == TRUE);
     // after which the reader should be 'closed'
     ASSERT(pdfrasread_is_open(reader) == FALSE);
+    // redundant closing is fine
+    ASSERT(pdfrasread_close(reader) == TRUE);
+    // f should still be the source for this reader!
+    ASSERT(pdfrasread_source(reader) == f);
     // clean up
     pdfrasread_destroy(reader);
     printf("passed\n");
