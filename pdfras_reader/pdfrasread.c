@@ -12,7 +12,8 @@
 ///////////////////////////////////////////////////////////////////////
 // Internal Constants
 
-#define PDFRASREAD_VERSION "0.6.0.0"
+#define PDFRASREAD_VERSION "0.7.0.0"
+// 0.7.0.0  spike   2016.08.17  API change - require a file-size function on create.
 // 0.6.0.0  spike   2016.08.14  moved this history inside the library
 //                              went to a.b.c.d version
 //                              added: pdfrasread_lib_version()
@@ -123,7 +124,7 @@ static unsigned long ulmax(unsigned long a, unsigned long b)
 static pduint32 pdfras_find_file_size(t_pdfrasreader* reader)
 {
     if (!VALID(reader)) {
-        global_error_handler(NULL, REPORTING_API, READ_API_BAD_READER, __LINE__);
+        global_error_handler(NULL, REPORTING_INTERNAL, READ_API_BAD_READER, __LINE__);
         return 0;
     }
     return reader->fsize(reader->source);
@@ -212,39 +213,45 @@ int pdfrasread_recognize_source(t_pdfrasreader* reader, void* source, int* pmajo
     if (pmajor) *pmajor = -1;
     if (pminor) *pminor = -1;
     if (!VALID(reader)) {
+        // you gave me junk
         global_error_handler(NULL, REPORTING_API, READ_API_BAD_READER, __LINE__);
         return FALSE;
     }
     if (pdfrasread_is_open(reader)) {
+        // can't do this with a reader that's currently open.
         reader->error_handler(reader, REPORTING_API, READ_API_ALREADY_OPEN, 0);
         return FALSE;
     }
+    // temporarily set our source so we can 
     reader->source = source;
-	// check the header, it's quick & easy and we do need
+    reader->filesize = reader->fsize(reader->source);
+    // check the header, it's quick & easy and we do need
 	// to know that it's some kind of PDF, not just any file
-	if (reader->fread(source, 0, 32, buffer) != 32) {
-		return FALSE;
-	}
-	if (!pdfras_recognize_pdf_header(buffer)) {
+	if (reader->fread(source, 0, 32, buffer) != 32 ||
+        !pdfras_recognize_pdf_header(buffer)) {
         // not PDF
+        reader->source = NULL;
 		return FALSE;
 	}
+    int major = 0, minor = 0;
     size_t tailsize = pdfras_read_tail(reader, buffer, sizeof buffer - 1);
+    reader->source = NULL;
     const char* tag = strrstr(buffer, "%PDF-raster-");
-    if (!tag || tag == buffer) {
+    if (!strrstr(buffer, "%%EOF") ||
+        !tag || tag == buffer ||
+        !pdfras_parse_pdfr_tag(tag, &major, &minor)) {
+        // not (valid) PDF, or not (valid) PDF/raster
         return FALSE;
     }
-    {
-        int major = 0, minor = 0;
-        if (!pdfras_parse_pdfr_tag(tag, &major, &minor)) {
-            return FALSE;
-        }
-        if (pmajor) *pmajor = major;
-        if (pminor) *pminor = minor;
-        if (major < 1 || major > RASREAD_MAX_MAJOR) {
-            return FALSE;
-        }
+    // Looks like a plausible PDF/raster file with version
+    if (pmajor) *pmajor = major;
+    if (pminor) *pminor = minor;
+    if (major < 1 || major > RASREAD_MAX_MAJOR) {
+        // Looks like PDF/raster, but the
+        // version is outside our comfort zone.
+        return FALSE;
     }
+    // All good.
     return TRUE;
 }
 
@@ -1424,11 +1431,19 @@ static int decode_strip_format(t_pdfrasreader* reader, pduint32* poff, unsigned 
 
 static int get_page_info(t_pdfrasreader* reader, int p, t_pdfpageinfo* pinfo)
 {
-	if (!reader || !pinfo) {
-		// TODO: internal error
-		return FALSE;
+	if (!VALID(reader)) {
+        global_error_handler(NULL, REPORTING_API, READ_API_BAD_READER, __LINE__);
+        return FALSE;
 	}
-	// clear info to all 0's
+    if (!pinfo) {
+        reader->error_handler(reader, REPORTING_API, READ_API_NULL_PARAM, __LINE__);
+        return FALSE;
+    }
+    if (!reader->bOpen) {
+        reader->error_handler(reader, REPORTING_API, READ_API_NOT_OPEN, __LINE__);
+        return FALSE;
+    }
+    // clear info to all 0's
 	memset(pinfo, 0, sizeof *pinfo);
 	// If we haven't 'opened' the file, do the initial stuff now
 	if (!reader->xrefs && !parse_trailer(reader)) {
@@ -1624,7 +1639,12 @@ t_pdfrasreader* pdfrasread_create(int apiLevel, pdfras_freader readfn, pdfras_fs
         global_error_handler(NULL, REPORTING_API, READ_API_APILEVEL, (pduint32)apiLevel);
         return NULL;
 	}
-	// some internal consistency checks
+    if (!readfn || !sizefn) {
+        // closer can be NULL, but not these guys
+        global_error_handler(NULL, REPORTING_API, READ_API_NULL_PARAM, (pduint32)apiLevel);
+        return NULL;
+    }
+    // some internal consistency checks
 	if (20 != sizeof(t_xref_entry)) {
 		// compilation/build error: xref entry is not exactly 20 bytes.
         global_error_handler(NULL, REPORTING_INTERNAL, READ_INTERNAL_XREF_SIZE, sizeof(t_xref_entry));
@@ -1652,12 +1672,8 @@ void pdfrasread_destroy(t_pdfrasreader* reader)
     if (!VALID(reader)) {
         global_error_handler(NULL, REPORTING_API, READ_API_BAD_READER, __LINE__);
     } else {
-		if (reader->page_table) {
-			free(reader->page_table);
-		}
-		if (reader->xrefs) {
-			free(reader->xrefs);
-		}
+        // force closed if open
+        pdfrasread_close(reader);
         reader->sig = 0xDEAD;
 		free(reader);
 	}
@@ -1674,6 +1690,10 @@ int pdfrasread_page_count(t_pdfrasreader* reader)
 {
     if (!VALID(reader)) {
         global_error_handler(NULL, REPORTING_API, READ_API_BAD_READER, __LINE__);
+        return -1;
+    }
+    if (!reader->bOpen) {
+        reader->error_handler(reader, REPORTING_API, READ_API_NOT_OPEN, __LINE__);
         return -1;
     }
     if (!reader->xrefs) {
@@ -1863,8 +1883,10 @@ int pdfrasread_open(t_pdfrasreader* reader, void* source)
         global_error_handler(NULL, REPORTING_API, READ_API_ALREADY_OPEN, __LINE__);
         return FALSE;
 	}
+    assert(!reader->bOpen);
 	reader->source = source;
-	if (!parse_trailer(reader)) {
+    reader->filesize = reader->fsize(reader->source);
+    if (!parse_trailer(reader)) {
         // not a valid PDF/raster file
 		reader->source = NULL;
 	}
@@ -1880,6 +1902,9 @@ void* pdfrasread_source(t_pdfrasreader* reader)
         global_error_handler(NULL, REPORTING_API, READ_API_BAD_READER, __LINE__);
         return NULL;
     }
+    // NOTE - we don't require that the reader be currently open!
+    // This returns the most recent source used with this reader, or
+    // NULL if this reader has never been open.
     return reader->source;
 }
 
@@ -1898,12 +1923,21 @@ int pdfrasread_close(t_pdfrasreader* reader)
         global_error_handler(NULL, REPORTING_API, READ_API_BAD_READER, __LINE__);
         return FALSE;
     }
-    if (!reader->bOpen) {
-        return FALSE;
+    // note, closing when reader is not open is valid, just a no-op.
+    if (reader->bOpen) {
+        if (reader->fclose) {
+            reader->fclose(reader->source);
+        }
+        reader->bOpen = PD_FALSE;
     }
-    if (reader->fclose) {
-        reader->fclose(reader->source);
+    if (reader->page_table) {
+        free(reader->page_table);
+        reader->page_table = NULL;
     }
-    reader->bOpen = PD_FALSE;
+    if (reader->xrefs) {
+        free(reader->xrefs);
+        reader->xrefs = NULL;
+    }
+    assert(reader->bOpen == PD_FALSE);
     return TRUE;
 }
