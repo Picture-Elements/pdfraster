@@ -50,10 +50,13 @@ typedef enum {
 
 typedef struct t_pdfrasreader t_pdfrasreader;
 
-// function template: read length bytes at offset from source into buffer
+// function template: read length bytes into buffer, starting at offset in source.
 typedef size_t (*pdfras_freader)(void *source, pduint32 offset, size_t length, char *buffer);
 
-// function template: close the source
+// function template: return the size of a source
+typedef pduint32 (*pdfras_fsizer)(void* source);
+
+// function template: close a source
 typedef void (*pdfras_fcloser)(void *source);
 
 // function template: error/warning handler
@@ -61,7 +64,7 @@ typedef int(*pdfras_err_handler)(t_pdfrasreader* reader, int level, int code, pd
 
 // Create a PDF/raster reader in the closed state.
 // Return NULL if a reader can't be constructed - typically that can only be a malloc failure.
-t_pdfrasreader* pdfrasread_create(int apiLevel, pdfras_freader readfn, pdfras_fcloser closefn);
+t_pdfrasreader* pdfrasread_create(int apiLevel, pdfras_freader readfn, pdfras_fsizer sizefn, pdfras_fcloser closefn);
 
 // Destroy the reader and release all associated resources.
 // If open, closes it (and calls the closefn (and ignores any error)).
@@ -125,7 +128,7 @@ int pdfrasread_open(t_pdfrasreader* reader, void* source);
 // designed to handle.
 // Returns TRUE if the major version is OK, EVEN IF the major.minor is
 // above what this library is compiled for.
-int pdfrasread_recognize_source(pdfras_freader fread, void* source, int* pmajor, int* pminor);
+int pdfrasread_recognize_source(t_pdfrasreader* reader, void* source, int* pmajor, int* pminor);
 
 // Return TRUE if reader has a PDF/raster stream open,
 // return FALSE otherwise.
@@ -188,6 +191,7 @@ typedef enum {
 	READ_OK = 0,
     READ_API_BAD_READER,            // an API function was called with an invalid reader
     READ_API_APILEVEL,              // pdfrasread_create called with apiLevel < 1 or > what library supports.
+    READ_API_ALREADY_OPEN,          // function called with a reader that was already open.
     READ_INTERNAL_XREF_SIZE,        // internal build/compilation error: sizeof(xref_entry) != 20 bytes
     READ_MEMORY_MALLOC,             // malloc returned NULL - insufficient memory (or heap corrupt)
     READ_FILE_EOF_MARKER,           // %%EOF not found near end of file (prob. not a PDF)

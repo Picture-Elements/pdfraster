@@ -13,6 +13,13 @@ static size_t file_reader(void *source, pduint32 offset, size_t length, char *bu
     return fread(buffer, sizeof(pduint8), length, f);
 }
 
+static pduint32 file_sizer(void* source)
+{
+    FILE* f = (FILE*)source;
+    fseek(f, 0, SEEK_END);
+    return (pduint32)ftell(f);
+}
+
 static void file_closer(void* source)
 {
     if (source) {
@@ -27,7 +34,12 @@ int pdfrasread_recognize_file(FILE* f)
 {
     int bYes = FALSE;
     if (f) {
-		bYes = pdfrasread_recognize_source(file_reader, f, NULL, NULL);
+        t_pdfrasreader* reader = pdfrasread_create(RASREAD_API_LEVEL, &file_reader, &file_sizer, NULL);
+        if (reader) {
+            bYes = pdfrasread_recognize_source(reader, f, NULL, NULL);
+            // destroy the reader
+            pdfrasread_destroy(reader);
+        }
     }
     return bYes;
 }
@@ -51,7 +63,7 @@ int pdfrasread_page_count_file(FILE* f)
 {
 	int nPages = -1;
 	// construct a PDF/raster reader based on the file
-	t_pdfrasreader* reader = pdfrasread_create(RASREAD_API_LEVEL, &file_reader, NULL);
+	t_pdfrasreader* reader = pdfrasread_create(RASREAD_API_LEVEL, &file_reader, &file_sizer, NULL);
 	if (reader) {
 		if (pdfrasread_open(reader, f)) {
 			// count its pages
@@ -76,7 +88,7 @@ int pdfrasread_page_count_filename(const char* fn)
 
 t_pdfrasreader* pdfrasread_open_file(int apiLevel, FILE* f)
 {
-	t_pdfrasreader* reader = pdfrasread_create(apiLevel, &file_reader, &file_closer);
+	t_pdfrasreader* reader = pdfrasread_create(apiLevel, &file_reader, &file_sizer, &file_closer);
 	if (reader) {
 		if (!pdfrasread_open(reader, f)) {
 			pdfrasread_destroy(reader);

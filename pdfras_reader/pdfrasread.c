@@ -70,8 +70,9 @@ typedef struct {
 typedef struct t_pdfrasreader {
     int                 sig;                // safety/validity signature
 	int					apiLevel;			// caller's specified API level.
-	pdfras_freader		fread;				// function for reading from source
-	pdfras_fcloser		fclose;				// source closer
+	pdfras_freader		fread;				// function to read from source
+    pdfras_fsizer       fsize;              // function to get size of source
+	pdfras_fcloser		fclose;				// function to close source
     pdfras_err_handler  error_handler;      // external error-reporting callback
 	pdbool				bOpen;				// whether this reader is open
 	void*				source;				// cookie/handle to caller-defined source
@@ -119,37 +120,23 @@ static unsigned long ulmax(unsigned long a, unsigned long b)
 // Utility functions, do not require a reader object
 //
 
-static pduint32 pdfras_find_file_size(pdfras_freader readfn, void* source)
+static pduint32 pdfras_find_file_size(t_pdfrasreader* reader)
 {
-	pduint32 off = 0x00000000, step = 0x800000;
-	pduint32 len = 0;
-	// find offset to EOF by binary search
-	while (step > 0) {
-		char tail[2];
-		switch (readfn(source, off + step, 2, tail)) {
-		case 1:
-			len = off + step + 1;
-			step = 0;
-			break;
-		case 0:
-			step = (step + 1) / 2;
-			break;
-		case 2:
-			off += step;
-			break;
-		} // switch
-	}
-	return len;
+    if (!VALID(reader)) {
+        global_error_handler(NULL, REPORTING_API, READ_API_BAD_READER, __LINE__);
+        return 0;
+    }
+    return reader->fsize(reader->source);
 } // pdfras_find_file_size
 
   // read the last len bytes, or as many as there are, from the reader->source.
   // Append a trailing NUL (so tail buffer's capacity must be at least len+1)
   // Returns the actual number of bytes read into the tail buffer.
-static size_t pdfras_read_tail(pdfras_freader readfn, void* source, char* tail, size_t len)
+static size_t pdfras_read_tail(t_pdfrasreader* reader, char* tail, size_t len)
 {
-	pduint32 off = pdfras_find_file_size(readfn, source);
+	pduint32 off = pdfras_find_file_size(reader);
 	off = (off < len) ? 0 : off - len;
-	size_t step = readfn(source, off, len, tail);
+	size_t step = reader->fread(reader->source, off, len, tail);
 	// make sure it's NUL-terminated but remember it could contain embedded NULs.
 	tail[step] = 0;
 	return step;
@@ -219,21 +206,30 @@ int pdfras_recognize_pdf_header(const void* sig)
 	return TRUE;
 }
 
-int pdfrasread_recognize_source(pdfras_freader readfn, void* source, int* pmajor, int* pminor)
+int pdfrasread_recognize_source(t_pdfrasreader* reader, void* source, int* pmajor, int* pminor)
 {
 	char buffer[1024];
     if (pmajor) *pmajor = -1;
     if (pminor) *pminor = -1;
+    if (!VALID(reader)) {
+        global_error_handler(NULL, REPORTING_API, READ_API_BAD_READER, __LINE__);
+        return FALSE;
+    }
+    if (pdfrasread_is_open(reader)) {
+        reader->error_handler(reader, REPORTING_API, READ_API_ALREADY_OPEN, 0);
+        return FALSE;
+    }
+    reader->source = source;
 	// check the header, it's quick & easy and we do need
 	// to know that it's some kind of PDF, not just any file
-	if (readfn(source, 0, 32, buffer) != 32) {
+	if (reader->fread(source, 0, 32, buffer) != 32) {
 		return FALSE;
 	}
 	if (!pdfras_recognize_pdf_header(buffer)) {
         // not PDF
 		return FALSE;
 	}
-    size_t tailsize = pdfras_read_tail(readfn, source, buffer, sizeof buffer - 1);
+    size_t tailsize = pdfras_read_tail(reader, buffer, sizeof buffer - 1);
     const char* tag = strrstr(buffer, "%PDF-raster-");
     if (!tag || tag == buffer) {
         return FALSE;
@@ -1286,9 +1282,9 @@ static int build_page_table(t_pdfrasreader* reader, pduint32 root)
 // Return TRUE if all OK, FALSE if some problem.
 static int parse_trailer(t_pdfrasreader* reader)
 {
-	reader->filesize = pdfras_find_file_size(reader->fread, reader->source);
+	reader->filesize = pdfras_find_file_size(reader);
 	char tail[1024+1];
-	size_t tailsize = pdfras_read_tail(reader->fread, reader->source, tail, sizeof tail - 1);
+	size_t tailsize = pdfras_read_tail(reader, tail, sizeof tail - 1);
     pduint32 off = reader->filesize - tailsize;
     const char* eof = strrstr(tail, "%%EOF");
     if (!eof) {
@@ -1616,7 +1612,7 @@ static int call_global_error_handler(t_pdfrasreader* reader, int level, int code
 // Top-Level Public Functions
 
 // Create a PDF/raster reader
-t_pdfrasreader* pdfrasread_create(int apiLevel, pdfras_freader readfn, pdfras_fcloser closefn)
+t_pdfrasreader* pdfrasread_create(int apiLevel, pdfras_freader readfn, pdfras_fsizer sizefn, pdfras_fcloser closefn)
 {
 	if (apiLevel < 1) {
 		// error, invalid parameter value
@@ -1643,6 +1639,7 @@ t_pdfrasreader* pdfrasread_create(int apiLevel, pdfras_freader readfn, pdfras_fc
     reader->sig = READER_SIGNATURE;
     reader->apiLevel = apiLevel;
     reader->fread = readfn;
+    reader->fsize = sizefn;
     reader->fclose = closefn;
     reader->error_handler = call_global_error_handler;
     reader->page_count = -1;		// Unknown
@@ -1863,7 +1860,8 @@ int pdfrasread_open(t_pdfrasreader* reader, void* source)
     }
 	if (reader->bOpen) {
         // already open, can't open it.
-		return FALSE;
+        global_error_handler(NULL, REPORTING_API, READ_API_ALREADY_OPEN, __LINE__);
+        return FALSE;
 	}
 	reader->source = source;
 	if (!parse_trailer(reader)) {

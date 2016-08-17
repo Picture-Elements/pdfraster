@@ -55,6 +55,12 @@ static size_t freader(void *source, pduint32 offset, size_t length, char *buffer
 	return fread(buffer, sizeof(pduint8), length, f);
 }
 
+static pduint32 fsizer(void *source)
+{
+    FILE* f = (FILE*)source;
+    fseek(f, 0, SEEK_END);
+    return (pduint32)ftell(f);
+}
 static void fcloser(void* source)
 {
 	if (source) {
@@ -67,7 +73,7 @@ static void fcloser(void* source)
 void create_destroy_tests()
 {
 	printf("-- reader create/destroy tests --\n");
-	t_pdfrasreader* reader = pdfrasread_create(RASREAD_API_LEVEL, &freader, &fcloser);
+	t_pdfrasreader* reader = pdfrasread_create(RASREAD_API_LEVEL, &freader, &fsizer, &fcloser);
 	ASSERT(reader != NULL);
 	// a freshly created reader is not open:
 	ASSERT(!pdfrasread_is_open(reader));
@@ -83,7 +89,7 @@ void create_destroy_tests()
 void open_close_tests()
 {
     printf("-- reader open/close tests --\n");
-    t_pdfrasreader* reader = pdfrasread_create(RASREAD_API_LEVEL, &freader, &fcloser);
+    t_pdfrasreader* reader = pdfrasread_create(RASREAD_API_LEVEL, &freader, &fsizer, &fcloser);
     ASSERT(reader != NULL);
     // test that we can open a valid PDF/raster file example
     // note the "b" mode, it's essential!
