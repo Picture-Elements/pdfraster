@@ -192,6 +192,8 @@ typedef enum {
     READ_API_NULL_PARAM,            // function called with null parameter that can't be null.
     READ_API_ALREADY_OPEN,          // function called with a reader that was already open.
     READ_API_NOT_OPEN,              // function called with a reader that isn't open.
+    READ_API_NO_SUCH_PAGE,          // function called with page index that is out-of-range
+    READ_API_NO_SUCH_STRIP,         // function called with strip index that is out-of-range
     READ_INTERNAL_XREF_SIZE,        // internal build/compilation error: sizeof(xref_entry) != 20 bytes
     READ_MEMORY_MALLOC,             // malloc returned NULL - insufficient memory (or heap corrupt)
     READ_FILE_EOF_MARKER,           // %%EOF not found near end of file (prob. not a PDF)
@@ -209,14 +211,18 @@ typedef enum {
 	READ_RESOURCES,					// each page dictionary must have a /Resources entry (that is a dictionary)
 	READ_XOBJECT,					// page resource dictionary must have /XObject entry
 	READ_XOBJECT_DICT,				// XObject has to be a dictionary
-	READ_XOBJECT_ENTRY,				// only entries in xobject dict must be /strip<n>
-	READ_NOT_STRIP_REF,				// strip entry in xobject dict must be an indirect reference to a dictionary
+	READ_XOBJECT_ENTRY,				// all entries in xobject dict must be /strip<n>
+	READ_STRIP_REF,			        // strip entry in xobject dict must be an indirect reference
+    READ_STRIP_DICT,                // strip must start with a dictionary
+    READ_STRIP_STREAM,              // strip must be a stream object
+    READ_STRIP_MISSING,             // missing strip entry in xobject dict
 	READ_STRIP_SUBTYPE,				// strip must have /Subtype /Image
 	READ_BITSPERCOMPONENT,			// strip must have /BitsPerComponent with inline unsigned integer value.
 	READ_STRIP_HEIGHT,				// strip must have /Height entry with inline non-negative integer value
 	READ_STRIP_WIDTH,				// strip must have /Width entry with inline non-negative integer value
+    READ_STRIP_WIDTH_SAME,          // all strips on a page must have equal /Width values
 	READ_STRIP_COLORSPACE,			// strip must have a /Colorspace entry
-	READ_INVALID_COLORSPACE,		// colorspace must comply with spec
+	READ_VALID_COLORSPACE,		    // colorspace must comply with spec
 	READ_STRIP_LENGTH,				// strip must have /Length with non-negative inline integer value
     READ_ERROR_CODE_COUNT
 } ReadErrorCode;

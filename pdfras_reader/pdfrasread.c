@@ -38,6 +38,12 @@
 #define CONFIGURATION "RELEASE"
 #endif
 
+// size of buffer to use while reading & parsing PDF
+// Note - making this bigger doesn't necessarily make things faster,
+// because PDF jumps around a lot, and this buffer isn't used
+// to read the big objects like strips.
+#define BLOCK_SIZE 1024
+
 ///////////////////////////////////////////////////////////////////////
 // Data Structures & Types
 
@@ -80,16 +86,16 @@ typedef struct t_pdfrasreader {
 	pduint32			filesize;			// source size, in bytes
     int                 major, minor;       // level of PDF/raster claimed by source
 	struct {
-		char			data[1024];
+		char			data[BLOCK_SIZE];
 		pduint32		off;
 		size_t			len;
 	}					buffer;
 	// cross-reference table
-	t_xref_entry*		xrefs;				// xref table (initially NULL)
 	unsigned long		numxrefs;			// number of entries in xref table
+	t_xref_entry*		xrefs;				// xref table (initially NULL, freed at close)
 	// page table
 	long				page_count;			// actual page count, or -1 for 'unknown'
-	pduint32*			page_table;			// table of page positions
+	pduint32*			page_table;			// table of page positions (freed at close)
 } t_pdfrasreader;
 
 ///////////////////////////////////////////////////////////////////////
@@ -120,28 +126,6 @@ static unsigned long ulmax(unsigned long a, unsigned long b)
 
 // Utility functions, do not require a reader object
 //
-
-static pduint32 pdfras_find_file_size(t_pdfrasreader* reader)
-{
-    if (!VALID(reader)) {
-        global_error_handler(NULL, REPORTING_INTERNAL, READ_API_BAD_READER, __LINE__);
-        return 0;
-    }
-    return reader->fsize(reader->source);
-} // pdfras_find_file_size
-
-  // read the last len bytes, or as many as there are, from the reader->source.
-  // Append a trailing NUL (so tail buffer's capacity must be at least len+1)
-  // Returns the actual number of bytes read into the tail buffer.
-static size_t pdfras_read_tail(t_pdfrasreader* reader, char* tail, size_t len)
-{
-	pduint32 off = pdfras_find_file_size(reader);
-	off = (off < len) ? 0 : off - len;
-	size_t step = reader->fread(reader->source, off, len, tail);
-	// make sure it's NUL-terminated but remember it could contain embedded NULs.
-	tail[step] = 0;
-	return step;
-}
 
 int pdfras_parse_pdfr_tag(const char* tag, int* pmajor, int* pminor)
 {
@@ -207,6 +191,22 @@ int pdfras_recognize_pdf_header(const void* sig)
 	return TRUE;
 }
 
+///////////////////////////////////////////////////////////////////////
+// low-level header/trailer checking
+
+  // read the last len bytes, or as many as there are, from the reader->source.
+  // Append a trailing NUL (so tail buffer's capacity must be at least len+1)
+  // Returns the actual number of bytes read into the tail buffer.
+static size_t pdfras_read_tail(t_pdfrasreader* reader, char* tail, size_t len)
+{
+    pduint32 off = reader->filesize;
+    off = (off < len) ? 0 : off - len;
+    size_t step = reader->fread(reader->source, off, len, tail);
+    // make sure it's NUL-terminated but remember it could contain embedded NULs.
+    tail[step] = 0;
+    return step;
+}
+
 int pdfrasread_recognize_source(t_pdfrasreader* reader, void* source, int* pmajor, int* pminor)
 {
 	char buffer[1024];
@@ -255,6 +255,9 @@ int pdfrasread_recognize_source(t_pdfrasreader* reader, void* source, int* pmajo
     return TRUE;
 }
 
+///////////////////////////////////////////////////////////////////////
+// Slightly higher-level error reporting functions
+
 static void informational(t_pdfrasreader* reader, int code, pduint32 offset)
 {
     if (VALID(reader)) {
@@ -286,6 +289,7 @@ static void compliance_error(t_pdfrasreader* reader, int code, pduint32 offset)
     }
 }
 
+///////////////////////////////////////////////////////////////////////
 // Low-level I/O functions
 
 // Read the next buffer-full into the buffer, or up to EOF.
@@ -1289,7 +1293,6 @@ static int build_page_table(t_pdfrasreader* reader, pduint32 root)
 // Return TRUE if all OK, FALSE if some problem.
 static int parse_trailer(t_pdfrasreader* reader)
 {
-	reader->filesize = pdfras_find_file_size(reader);
 	char tail[1024+1];
 	size_t tailsize = pdfras_read_tail(reader, tail, sizeof tail - 1);
     pduint32 off = reader->filesize - tailsize;
@@ -1429,9 +1432,12 @@ static int decode_strip_format(t_pdfrasreader* reader, pduint32* poff, unsigned 
 	return TRUE;
 }
 
+// return all the info about page p of the open file.
 static int get_page_info(t_pdfrasreader* reader, int p, t_pdfpageinfo* pinfo)
 {
-	if (!VALID(reader)) {
+    // While this is not a public function, it is called by a bunch of trivial
+    // public functions - that's why it reports API errors.
+    if (!VALID(reader)) {
         global_error_handler(NULL, REPORTING_API, READ_API_BAD_READER, __LINE__);
         return FALSE;
 	}
@@ -1496,38 +1502,62 @@ static int get_page_info(t_pdfrasreader* reader, int p, t_pdfpageinfo* pinfo)
 		return FALSE;
 	}
 	// Traverse the XObject dictionary collecting strip info
-	if (!token_match(reader, &xobjects, "<<")) {
+    pduint32 off = xobjects;
+	if (!token_match(reader, &off, "<<")) {
 		// invalid PDF: XObject dictionary doesn't start with '<<'
 		compliance_error(reader, READ_XOBJECT_DICT, xobjects);
 		return FALSE;
 	}
-	int n;				// strip no
-	for (n = 0; !token_match(reader, &xobjects, ">>"); n++) {
-		pduint32 xobj_entry = xobjects;
-		if (peekch(reader, xobjects) != '/' ||
-			nextch(reader, &xobjects) != 's' ||
-			nextch(reader, &xobjects) != 't' ||
-			nextch(reader, &xobjects) != 'r' ||
-			nextch(reader, &xobjects) != 'i' ||
-			nextch(reader, &xobjects) != 'p' ||
-			!isdigit(nextch(reader, &xobjects))
-			) {
-			// illegal entry in xobjects dictionary - only /strip<n> allowed
-			compliance_error(reader, READ_XOBJECT_ENTRY, xobj_entry);
-			return FALSE;
-		}
-		unsigned long stripno;
-		if (!token_ulong(reader, &xobjects, &stripno)) {
-			// PDF/raster: strips must be named /strip0, /strip1, /strip2, etc.
-			compliance_error(reader, READ_XOBJECT_ENTRY, xobjects);
-			return FALSE;
-		}
-		pduint32 strip;
-		if (!parse_indirect_reference(reader, &xobjects, &strip)) {
-			// invalid PDF: strip entry in XObject dict doesn't point to strip stream
-			compliance_error(reader, READ_NOT_STRIP_REF, xobj_entry);
-			return FALSE;
-		}
+    // scan the /XObject dictionary once, validating entries
+    // as /strip<n> and counting total entries
+	int nstrips;				// strip no
+    for (nstrips = 0; !token_match(reader, &off, ">>"); nstrips++) {
+        pduint32 xobj_entry = off;
+        if (peekch(reader, off) != '/' ||
+            nextch(reader, &off) != 's' ||
+            nextch(reader, &off) != 't' ||
+            nextch(reader, &off) != 'r' ||
+            nextch(reader, &off) != 'i' ||
+            nextch(reader, &off) != 'p' ||
+            !isdigit(nextch(reader, &off))
+            ) {
+            // illegal entry in xobjects dictionary - only /strip<n> allowed
+            compliance_error(reader, READ_XOBJECT_ENTRY, xobj_entry);
+            return FALSE;
+        }
+        unsigned long stripno;
+        if (!token_ulong(reader, &off, &stripno)) {
+            // PDF/raster: strips must be named /strip0, /strip1, /strip2, etc.
+            compliance_error(reader, READ_XOBJECT_ENTRY, off);
+            return FALSE;
+        }
+        // value of the strip<n> entry must be indirect ref
+        pduint32 strip;
+        if (!parse_indirect_reference(reader, &off, &strip)) {
+            // invalid PDF: strip entry in XObject dict isn't an indirect reference
+            compliance_error(reader, READ_STRIP_REF, off);
+            return FALSE;
+        }
+        // indirect ref must point to a dictionary (in fact a stream)
+        if (!token_match(reader, &strip, "<<")) {
+            // invalid PDF: strip isn't a dict/stream
+            compliance_error(reader, READ_STRIP_DICT, strip);
+            return FALSE;
+        }
+    }
+    // then look up strips 0..nstrips-1 to make sure they are all present
+    for (int stripno = 0; stripno < nstrips; stripno++) {
+        pduint32 strip_ref;
+        char stripname[32];
+        sprintf(stripname, "/strip%d", stripno);
+        if (!dictionary_lookup(reader, xobjects, stripname, &strip_ref)) {
+            // strip not found in XObject dictionary
+            compliance_error(reader, READ_STRIP_MISSING, xobjects);
+            return FALSE;
+        }
+        // follow indirect reference to get offset of strip stream
+        pduint32 strip;
+        parse_indirect_reference(reader, &strip_ref, &strip);
 		if (!dictionary_lookup(reader, strip, "/Subtype", &val) || !token_match(reader, &val, "/Image")) {
 			// strip isn't an image?
 			compliance_error(reader, READ_STRIP_SUBTYPE, strip);
@@ -1558,9 +1588,9 @@ static int get_page_info(t_pdfrasreader* reader, int p, t_pdfpageinfo* pinfo)
 		}
 		else {
 			// all strips on a page must have the same width
-			// TODO: report error instead of assert
-			assert(pinfo->width == width);
-		}
+            compliance_error(reader, READ_STRIP_WIDTH_SAME, strip);
+            return FALSE;
+        }
 		if (!dictionary_lookup(reader, strip, "/ColorSpace", &val)) {
 			// PDF/raster: image object, each strip must have a named ColorSpace
 			compliance_error(reader, READ_STRIP_COLORSPACE, strip);
@@ -1568,7 +1598,7 @@ static int get_page_info(t_pdfrasreader* reader, int p, t_pdfpageinfo* pinfo)
 		}
 		if (!parse_color_space(reader, &val, stripno, pinfo)) {
 			// PDF/raster: invalid color space in strip
-			compliance_error(reader, READ_INVALID_COLORSPACE, val);
+			compliance_error(reader, READ_VALID_COLORSPACE, val);
 			return FALSE;
 		}
 		// max_strip_size is (surprise) the maximum of the strip sizes (in bytes)
@@ -1588,30 +1618,34 @@ static int get_page_info(t_pdfrasreader* reader, int p, t_pdfpageinfo* pinfo)
 	return TRUE;
 }
 
+// Look up strip s in page p and return the offset of that strip-stream
 static int find_strip(t_pdfrasreader* reader, int p, int s, pduint32* pstrip)
 {
-    char stripname[32];
-
-    sprintf(stripname, "/strip%d", s);
-
     // look up the file position of the nth page object:
     pduint32 page = get_page_pos(reader, p);
     if (!page) {
+        reader->error_handler(reader, REPORTING_API, READ_API_NO_SUCH_PAGE, __LINE__);
         return FALSE;
     }
     pduint32 resdict;
     if (!dictionary_lookup(reader, page, "/Resources", &resdict)) {
         // bad page object, no /Resources entry
+        compliance_error(reader, READ_RESOURCES, page);
         return FALSE;
     }
     // In the Resources dictionary find the XObject dictionary
     pduint32 xobjects;
     if (!dictionary_lookup(reader, resdict, "/XObject", &xobjects)) {
         // bad resource dictionary, no /XObject entry
+        compliance_error(reader, READ_XOBJECT, resdict);
         return FALSE;
     }
+
+    char stripname[32];
+    sprintf(stripname, "/strip%d", s);
     if (!dictionary_lookup(reader, xobjects, stripname, pstrip)) {
         // strip not found in XObject dictionary
+        reader->error_handler(reader, REPORTING_API, READ_API_NO_SUCH_STRIP, __LINE__);
         return FALSE;
     }
     return TRUE;
@@ -1930,6 +1964,7 @@ int pdfrasread_close(t_pdfrasreader* reader)
         }
         reader->bOpen = PD_FALSE;
     }
+    // free structures that cannot be needed now
     if (reader->page_table) {
         free(reader->page_table);
         reader->page_table = NULL;
