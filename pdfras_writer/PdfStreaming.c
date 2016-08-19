@@ -268,16 +268,17 @@ static void writestreambody(t_pdoutstream *os, t_pdvalue dict)
 	// create a datasink wrapper around the Stream and the outstream
 	t_datasink *sink = stream_datasink_new(os);
 	if (sink) {
-		pduint32 startpos = pd_outstream_pos(os);
 		pd_puts(os, "\r\nstream\r\n");
-		// Call the Stream's content generator to write its contents
+        // record start of stream data
+        pduint32 startpos = pd_outstream_pos(os);
+        // Call the Stream's content generator to write its contents
 		// to the sink (which writes it to the outstream):
 		stream_write_data(dict, sink);
-		// If there's an indirect /Length entry in the Stream dictionary, resolve it
 		pduint32 finalpos = pd_outstream_pos(os);
-		stream_resolve_length(dict, finalpos - startpos);
 		// write the ending keyword after the stream data.
 		pd_puts(os, "\r\nendstream\r\n");
+		// If there's an indirect /Length entry in the Stream dictionary, resolve it
+		stream_resolve_length(dict, finalpos - startpos);
 		pd_datasink_free(sink);
 	}
 }

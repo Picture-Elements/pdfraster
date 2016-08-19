@@ -14,7 +14,8 @@ extern "C" {
 // Version of the file format we support (or at least, write)
 #define PDFRASTER_SPEC_VERSION "1.0"
 
-#define PDFRAS_LIBRARY_VERSION "0.14"
+#define PDFRAS_LIBRARY_VERSION "0.15"
+// 0.15 spike   2016.08.18  fix: length of strip streams was wrong.
 // 0.14	spike	2016.07.20	pdfras_writer_managed compiles & links /clr!
 // 0.13	spike	2016.07.13	moved signature to end of trailer dict
 //							introduced first high-level PdfRaster tests.
