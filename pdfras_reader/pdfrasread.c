@@ -12,7 +12,8 @@
 ///////////////////////////////////////////////////////////////////////
 // Internal Constants
 
-#define PDFRASREAD_VERSION "0.7.0.0"
+#define PDFRASREAD_VERSION "0.7.1.0"
+// 0.7.1.0  spike   2016.08.18  internal clean-up, fixing failing tests
 // 0.7.0.0  spike   2016.08.17  API change - require a file-size function on create.
 // 0.6.0.0  spike   2016.08.14  moved this history inside the library
 //                              went to a.b.c.d version
@@ -192,6 +193,71 @@ int pdfras_recognize_pdf_header(const void* sig)
 }
 
 ///////////////////////////////////////////////////////////////////////
+// Slightly higher-level error reporting functions
+
+static void io_error(t_pdfrasreader* reader, int code, pduint32 hint)
+{
+    if (VALID(reader)) {
+        reader->error_handler(reader, REPORTING_IO, code, hint);
+    }
+    else {
+        global_error_handler(NULL, REPORTING_IO, code, hint);
+    }
+}
+
+
+static void internal_error(t_pdfrasreader* reader, int code, pduint32 line)
+{
+    if (VALID(reader)) {
+        reader->error_handler(reader, REPORTING_INTERNAL, code, line);
+    }
+    else {
+        global_error_handler(NULL, REPORTING_INTERNAL, code, line);
+    }
+}
+
+static void api_error(t_pdfrasreader* reader, int code, pduint32 hint)
+{
+    if (VALID(reader)) {
+        reader->error_handler(reader, REPORTING_API, code, hint);
+    }
+    else {
+        global_error_handler(NULL, REPORTING_API, code, hint);
+    }
+}
+
+static void informational(t_pdfrasreader* reader, int code, pduint32 offset)
+{
+    if (VALID(reader)) {
+        reader->error_handler(reader, REPORTING_INFO, code, offset);
+    }
+    else {
+        global_error_handler(NULL, REPORTING_INFO, code, offset);
+    }
+}
+
+static void warning(t_pdfrasreader* reader, int code, pduint32 offset)
+{
+    if (VALID(reader)) {
+        reader->error_handler(reader, REPORTING_WARNING, code, offset);
+    }
+    else {
+        global_error_handler(NULL, REPORTING_WARNING, code, offset);
+    }
+}
+
+// report a failure to comply with the PDF/raster spec, at offset in file
+static void compliance_error(t_pdfrasreader* reader, int code, pduint32 offset)
+{
+    if (VALID(reader)) {
+        reader->error_handler(reader, REPORTING_COMPLIANCE, code, offset);
+    }
+    else {
+        global_error_handler(NULL, REPORTING_COMPLIANCE, code, offset);
+    }
+}
+
+///////////////////////////////////////////////////////////////////////
 // low-level header/trailer checking
 
   // read the last len bytes, or as many as there are, from the reader->source.
@@ -214,12 +280,12 @@ int pdfrasread_recognize_source(t_pdfrasreader* reader, void* source, int* pmajo
     if (pminor) *pminor = -1;
     if (!VALID(reader)) {
         // you gave me junk
-        global_error_handler(NULL, REPORTING_API, READ_API_BAD_READER, __LINE__);
+        api_error(NULL, READ_API_BAD_READER, __LINE__);
         return FALSE;
     }
     if (pdfrasread_is_open(reader)) {
         // can't do this with a reader that's currently open.
-        reader->error_handler(reader, REPORTING_API, READ_API_ALREADY_OPEN, 0);
+        api_error(reader, READ_API_ALREADY_OPEN, __LINE__);
         return FALSE;
     }
     // temporarily set our source so we can 
@@ -253,40 +319,6 @@ int pdfrasread_recognize_source(t_pdfrasreader* reader, void* source, int* pmajo
     }
     // All good.
     return TRUE;
-}
-
-///////////////////////////////////////////////////////////////////////
-// Slightly higher-level error reporting functions
-
-static void informational(t_pdfrasreader* reader, int code, pduint32 offset)
-{
-    if (VALID(reader)) {
-        reader->error_handler(reader, REPORTING_INFO, code, offset);
-    }
-    else {
-        global_error_handler(NULL, REPORTING_INFO, code, offset);
-    }
-}
-
-static void warning(t_pdfrasreader* reader, int code, pduint32 offset)
-{
-    if (VALID(reader)) {
-        reader->error_handler(reader, REPORTING_WARNING, code, offset);
-    }
-    else {
-        global_error_handler(NULL, REPORTING_WARNING, code, offset);
-    }
-}
-
-// report a failure to comply with the PDF/raster spec, at offset in file
-static void compliance_error(t_pdfrasreader* reader, int code, pduint32 offset)
-{
-    if (VALID(reader)) {
-        reader->error_handler(reader, REPORTING_COMPLIANCE, code, offset);
-    }
-    else {
-        global_error_handler(NULL, REPORTING_COMPLIANCE, code, offset);
-    }
 }
 
 ///////////////////////////////////////////////////////////////////////
@@ -691,7 +723,8 @@ static int token_hex_string(t_pdfrasreader* reader, pduint32* poff)
 // Xref table access
 
 // Look up the indirect object (num,gen) in the cross-ref table and return its file position *pobjpos.
-// Returns TRUE if successful, FALSE if not.
+// Returns TRUE if successful,
+// Returns FALSE if no xref entry found, and leaves *pobjpos unchanged.
 static int xref_lookup(t_pdfrasreader* reader, unsigned num, unsigned gen, pduint32 *pobjpos)
 {
 	if (gen != 0) {
@@ -809,9 +842,10 @@ static int parse_dictionary(t_pdfrasreader* reader, pduint32 *poff)
 
 // Parse a dictionary or stream.
 // If successful, return TRUE and advance *poff over the object to the next token.
-// Otherwise return FALSE and leave *poff unmoved.
+// Otherwise return FALSE and leave *poff unchanged.
 // If a stream is found, set *pstream to the position of the stream data, and *plen to its length in bytes.
-// Values are only returned through pstream or plen if they are non-NULL.
+// If a dictionary (not a stream) is found, *pstream and *plen are set to 0.
+// Note however that values are only returned through pstream or plen if those are non-NULL.
 static int parse_dictionary_or_stream(t_pdfrasreader* reader, pduint32 *poff, pduint32 *pstream, long* plen)
 {
 	pduint32 off = *poff;
@@ -825,10 +859,13 @@ static int parse_dictionary_or_stream(t_pdfrasreader* reader, pduint32 *poff, pd
 		peekch(reader, off + 4) != 'a' ||
 		peekch(reader, off + 5) != 'm' ||
 		!isspace(peekch(reader, off + 6))) {
-		// Valid dictionary, but not a stream
+		// Valid dictionary, but not a stream.
+        // report stream pos & length as 0
+        // (if caller wants them)
+        if (pstream) *pstream = 0;
+        if (plen) *plen = 0;
+        // Update *poff to after dictionary
 		*poff = off;
-		if (pstream) *pstream = 0;
-		if (plen) *plen = 0;
 		return TRUE;
 	}
 	off += 6;
@@ -837,34 +874,44 @@ static int parse_dictionary_or_stream(t_pdfrasreader* reader, pduint32 *poff, pd
 	if (ch == 0x0D) {
 		// CR must be followed by LF
 		if (nextch(reader, &off) != 0x0A) {
+            compliance_error(reader, READ_STREAM_CRLF, off);
 			return FALSE;
 		}
 	} else if (ch != 0x0A) {
 		// Alternative to CRLF is just LF
+        compliance_error(reader, READ_STREAM_LINEBREAK, off);
 		return FALSE;
 	}
 	// we're positioned at the LF, step over it.
 	off++;
 	pduint32 lenpos;
+    // *poff is still start of dictionary
 	if (!dictionary_lookup(reader, *poff, "/Length", &lenpos)) {
 		// invalid stream: no /Length key in stream dictionary
+        compliance_error(reader, READ_STREAM_LENGTH, *poff);
 		return FALSE;
 	}
 	long length;
-	if (!parse_long_value(reader, &lenpos, &length)) {
+	if (!parse_long_value(reader, &lenpos, &length) || length < 0) {
+        // length isn't a (non-negative) integer
+        compliance_error(reader, READ_STREAM_LENGTH_INT, lenpos);
 		return FALSE;
 	}
-	// we've found position and length of stream data:
-	if (pstream) *pstream = off;
-	if (plen) *plen = length;
 	// step over stream data
-	off += length;
-	// Step over 'endstream' keyword.
-	if (!token_match(reader, &off, "endstream")) {
-		// invalid stream: 'endstream' not found where expected
+    pduint32 endstream = off + length;
+	// Parse 'endstream' keyword.
+	if (!token_match(reader, &endstream, "endstream")) {
+		// invalid stream: 'endstream' not found where expected.
+        // Report error at start of dictionary, it could be wrong /Length,
+        // or keywords could be slightly misplaced, or who knows.
+        compliance_error(reader, READ_STREAM_ENDSTREAM, *poff);
 		return FALSE;
 	}
-	*poff = off;
+    // return position and length of stream data:
+    if (pstream) *pstream = off;
+    if (plen) *plen = length;
+    // update offset to just beyond "endstream" keyword:
+	*poff = endstream;
 	return TRUE;
 }
 
@@ -1078,6 +1125,7 @@ static int dictionary_lookup(t_pdfrasreader* reader, pduint32 off, const char* k
 				// and we already parsed it.
 				if (!xref_lookup(reader, num, gen, &off)) {
 					// invalid PDF - referenced object is not in cross-reference table
+                    compliance_error(reader, READ_NO_SUCH_XREF, off);
 					return FALSE;
 				}
 			}
@@ -1438,15 +1486,15 @@ static int get_page_info(t_pdfrasreader* reader, int p, t_pdfpageinfo* pinfo)
     // While this is not a public function, it is called by a bunch of trivial
     // public functions - that's why it reports API errors.
     if (!VALID(reader)) {
-        global_error_handler(NULL, REPORTING_API, READ_API_BAD_READER, __LINE__);
+        api_error(NULL, READ_API_BAD_READER, __LINE__);
         return FALSE;
 	}
     if (!pinfo) {
-        reader->error_handler(reader, REPORTING_API, READ_API_NULL_PARAM, __LINE__);
+        api_error(reader, READ_API_NULL_PARAM, __LINE__);
         return FALSE;
     }
     if (!reader->bOpen) {
-        reader->error_handler(reader, REPORTING_API, READ_API_NOT_OPEN, __LINE__);
+        api_error(reader, READ_API_NOT_OPEN, __LINE__);
         return FALSE;
     }
     // clear info to all 0's
@@ -1547,17 +1595,17 @@ static int get_page_info(t_pdfrasreader* reader, int p, t_pdfpageinfo* pinfo)
     }
     // then look up strips 0..nstrips-1 to make sure they are all present
     for (int stripno = 0; stripno < nstrips; stripno++) {
-        pduint32 strip_ref;
+        pduint32 strip;
         char stripname[32];
         sprintf(stripname, "/strip%d", stripno);
-        if (!dictionary_lookup(reader, xobjects, stripname, &strip_ref)) {
+        if (!dictionary_lookup(reader, xobjects, stripname, &strip)) {
             // strip not found in XObject dictionary
             compliance_error(reader, READ_STRIP_MISSING, xobjects);
             return FALSE;
         }
-        // follow indirect reference to get offset of strip stream
-        pduint32 strip;
-        parse_indirect_reference(reader, &strip_ref, &strip);
+        // important note: when dictionary_lookup finds an entry and the
+        // entry's value is an indirect reference, it returns the position
+        // of the resolved (referenced) object.
 		if (!dictionary_lookup(reader, strip, "/Subtype", &val) || !token_match(reader, &val, "/Image")) {
 			// strip isn't an image?
 			compliance_error(reader, READ_STRIP_SUBTYPE, strip);
@@ -1565,7 +1613,7 @@ static int get_page_info(t_pdfrasreader* reader, int p, t_pdfpageinfo* pinfo)
 		}
 		if (!dictionary_lookup(reader, strip, "/BitsPerComponent", &val) || !token_ulong(reader, &val, &pinfo->BitsPerComponent)) {
 			// strip doesn't have BitsPerComponent?
-			compliance_error(reader, READ_BITSPERCOMPONENT, strip);
+			compliance_error(reader, READ_STRIP_BITSPERCOMPONENT, strip);
 			return FALSE;
 		}
 		unsigned long strip_height;
@@ -1624,7 +1672,7 @@ static int find_strip(t_pdfrasreader* reader, int p, int s, pduint32* pstrip)
     // look up the file position of the nth page object:
     pduint32 page = get_page_pos(reader, p);
     if (!page) {
-        reader->error_handler(reader, REPORTING_API, READ_API_NO_SUCH_PAGE, __LINE__);
+        api_error(reader, READ_API_NO_SUCH_PAGE, __LINE__);
         return FALSE;
     }
     pduint32 resdict;
@@ -1645,7 +1693,7 @@ static int find_strip(t_pdfrasreader* reader, int p, int s, pduint32* pstrip)
     sprintf(stripname, "/strip%d", s);
     if (!dictionary_lookup(reader, xobjects, stripname, pstrip)) {
         // strip not found in XObject dictionary
-        reader->error_handler(reader, REPORTING_API, READ_API_NO_SUCH_STRIP, __LINE__);
+        api_error(reader, READ_API_NO_SUCH_STRIP, __LINE__);
         return FALSE;
     }
     return TRUE;
@@ -1663,25 +1711,20 @@ static int call_global_error_handler(t_pdfrasreader* reader, int level, int code
 // Create a PDF/raster reader
 t_pdfrasreader* pdfrasread_create(int apiLevel, pdfras_freader readfn, pdfras_fsizer sizefn, pdfras_fcloser closefn)
 {
-	if (apiLevel < 1) {
-		// error, invalid parameter value
-        global_error_handler(NULL, REPORTING_API, READ_API_APILEVEL, (pduint32)apiLevel);
-        return NULL;
-	}
-	if (apiLevel > RASREAD_API_LEVEL) {
+	if (apiLevel < 1 || apiLevel > RASREAD_API_LEVEL) {
 		// error, caller expects a future version of this API
-        global_error_handler(NULL, REPORTING_API, READ_API_APILEVEL, (pduint32)apiLevel);
+        api_error(NULL, READ_API_APILEVEL, (pduint32)apiLevel);
         return NULL;
 	}
     if (!readfn || !sizefn) {
         // closer can be NULL, but not these guys
-        global_error_handler(NULL, REPORTING_API, READ_API_NULL_PARAM, (pduint32)apiLevel);
+        api_error(NULL, READ_API_NULL_PARAM, __LINE__);
         return NULL;
     }
     // some internal consistency checks
 	if (20 != sizeof(t_xref_entry)) {
 		// compilation/build error: xref entry is not exactly 20 bytes.
-        global_error_handler(NULL, REPORTING_INTERNAL, READ_INTERNAL_XREF_SIZE, sizeof(t_xref_entry));
+        internal_error(NULL, READ_INTERNAL_XREF_SIZE, sizeof(t_xref_entry));
         return NULL;
 	}
 	t_pdfrasreader* reader = (t_pdfrasreader*)malloc(sizeof(t_pdfrasreader));
@@ -1704,7 +1747,7 @@ t_pdfrasreader* pdfrasread_create(int apiLevel, pdfras_freader readfn, pdfras_fs
 void pdfrasread_destroy(t_pdfrasreader* reader)
 {
     if (!VALID(reader)) {
-        global_error_handler(NULL, REPORTING_API, READ_API_BAD_READER, __LINE__);
+        api_error(NULL, READ_API_BAD_READER, __LINE__);
     } else {
         // force closed if open
         pdfrasread_close(reader);
@@ -1723,11 +1766,11 @@ const char* pdfrasread_lib_version(void)
 int pdfrasread_page_count(t_pdfrasreader* reader)
 {
     if (!VALID(reader)) {
-        global_error_handler(NULL, REPORTING_API, READ_API_BAD_READER, __LINE__);
+        api_error(NULL, READ_API_BAD_READER, __LINE__);
         return -1;
     }
     if (!reader->bOpen) {
-        reader->error_handler(reader, REPORTING_API, READ_API_NOT_OPEN, __LINE__);
+        api_error(reader, READ_API_NOT_OPEN, __LINE__);
         return -1;
     }
     if (!reader->xrefs) {
@@ -1824,7 +1867,7 @@ size_t pdfrasread_max_strip_size(t_pdfrasreader* reader, int p)
 size_t pdfrasread_read_raw_strip(t_pdfrasreader* reader, int p, int s, void* buffer, size_t bufsize)
 {
     if (!VALID(reader)) {
-        global_error_handler(NULL, REPORTING_API, READ_API_BAD_READER, __LINE__);
+        api_error(NULL, READ_API_BAD_READER, __LINE__);
         return 0;
     }
     // find the strip
@@ -1836,16 +1879,24 @@ size_t pdfrasread_read_raw_strip(t_pdfrasreader* reader, int p, int s, void* buf
     // Parse the strip stream and find the position & length of its data
     pduint32 pos;
     long length;
-    if (!parse_dictionary_or_stream(reader, &strip, &pos, &length) || pos == 0 || length == 0) {
+    if (!parse_dictionary_or_stream(reader, &strip, &pos, &length)) {
         // strip stream not found or invalid
+        // compliance errors have already been reported
+        return 0;
+    }
+    if (pos == 0 || length == 0) {
+        // dictionary, but not a stream!
+        compliance_error(reader, READ_STRIP_NOT_STREAM, strip);
         return 0;
     }
     if ((unsigned)length > bufsize) {
         // invalid strip request, strip does not fit in buffer
+        api_error(reader, READ_STRIP_BUFFER_SIZE, length);
         return 0;
     }
     if (reader->fread(reader->source, pos, length, buffer) != length) {
         // read error, unable to read all of strip data
+        io_error(reader, READ_STRIP_READ, s);
         return 0;
     }
     return length;
@@ -1882,7 +1933,7 @@ int pdfrasread_default_error_handler(t_pdfrasreader* reader, int level, int code
 void pdfrasread_set_error_handler(t_pdfrasreader* reader, pdfras_err_handler errhandler)
 {
     if (!VALID(reader)) {
-        global_error_handler(NULL, REPORTING_API, READ_API_BAD_READER, __LINE__);
+        api_error(NULL, READ_API_BAD_READER, __LINE__);
     } else {
         if (!errhandler) {
             errhandler = call_global_error_handler;
@@ -1909,12 +1960,12 @@ void pdfrasread_get_highest_pdfr_version(t_pdfrasreader* reader, int* pmajor, in
 int pdfrasread_open(t_pdfrasreader* reader, void* source)
 {
     if (!VALID(reader)) {
-        global_error_handler(NULL, REPORTING_API, READ_API_BAD_READER, __LINE__);
+        api_error(NULL, READ_API_BAD_READER, __LINE__);
         return FALSE;
     }
 	if (reader->bOpen) {
         // already open, can't open it.
-        global_error_handler(NULL, REPORTING_API, READ_API_ALREADY_OPEN, __LINE__);
+        api_error(reader, READ_API_ALREADY_OPEN, __LINE__);
         return FALSE;
 	}
     assert(!reader->bOpen);
@@ -1933,7 +1984,7 @@ int pdfrasread_open(t_pdfrasreader* reader, void* source)
 void* pdfrasread_source(t_pdfrasreader* reader)
 {
     if (!VALID(reader)) {
-        global_error_handler(NULL, REPORTING_API, READ_API_BAD_READER, __LINE__);
+        api_error(NULL, READ_API_BAD_READER, __LINE__);
         return NULL;
     }
     // NOTE - we don't require that the reader be currently open!
@@ -1945,7 +1996,7 @@ void* pdfrasread_source(t_pdfrasreader* reader)
 int pdfrasread_is_open(t_pdfrasreader* reader)
 {
     if (!VALID(reader)) {
-        global_error_handler(NULL, REPORTING_API, READ_API_BAD_READER, __LINE__);
+        api_error(NULL, READ_API_BAD_READER, __LINE__);
         return FALSE;
     }
 	return reader->bOpen;
@@ -1954,7 +2005,7 @@ int pdfrasread_is_open(t_pdfrasreader* reader)
 int pdfrasread_close(t_pdfrasreader* reader)
 {
     if (!VALID(reader)) {
-        global_error_handler(NULL, REPORTING_API, READ_API_BAD_READER, __LINE__);
+        api_error(NULL, READ_API_BAD_READER, __LINE__);
         return FALSE;
     }
     // note, closing when reader is not open is valid, just a no-op.

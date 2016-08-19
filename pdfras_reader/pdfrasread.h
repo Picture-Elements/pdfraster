@@ -194,6 +194,7 @@ typedef enum {
     READ_API_NOT_OPEN,              // function called with a reader that isn't open.
     READ_API_NO_SUCH_PAGE,          // function called with page index that is out-of-range
     READ_API_NO_SUCH_STRIP,         // function called with strip index that is out-of-range
+    READ_STRIP_BUFFER_SIZE,         // strip too big to fit in provided strip buffer.
     READ_INTERNAL_XREF_SIZE,        // internal build/compilation error: sizeof(xref_entry) != 20 bytes
     READ_MEMORY_MALLOC,             // malloc returned NULL - insufficient memory (or heap corrupt)
     READ_FILE_EOF_MARKER,           // %%EOF not found near end of file (prob. not a PDF)
@@ -203,6 +204,13 @@ typedef enum {
     READ_FILE_BAD_TAG,              // %PDF-raster- not followed by valid <int>.<int><eol>
     READ_FILE_TOO_MAJOR,            // file's PDF-raster major version is above what this library supports.
     READ_FILE_TOO_MINOR,            // this file's PDF-raster minor version is above what this library understands.
+    READ_STRIP_READ,                // reading a strip's data returned less than the expected number of bytes. 
+    READ_NO_SUCH_XREF,              // indirect object not found in xref table
+    READ_STREAM_CRLF,               // stream keyword followed by CR but then no LF
+    READ_STREAM_LINEBREAK,          // stream keyword not followed by CRLF or LF
+    READ_STREAM_LENGTH,             // stream dictionary /Length entry not found
+    READ_STREAM_LENGTH_INT,         // stream - /Length value isn't an integer literal
+    READ_STREAM_ENDSTREAM,          // endstream not found where expected
     READ_PAGE_TYPE,					// page dict must have /Type /Page
 	READ_PAGE_ROTATION,				// page rotation if present must be an inline non-negative multiple of 90.
 	READ_PAGE_MEDIABOX,				// each page dict must have a /MediaBox entry
@@ -214,16 +222,16 @@ typedef enum {
 	READ_XOBJECT_ENTRY,				// all entries in xobject dict must be /strip<n>
 	READ_STRIP_REF,			        // strip entry in xobject dict must be an indirect reference
     READ_STRIP_DICT,                // strip must start with a dictionary
-    READ_STRIP_STREAM,              // strip must be a stream object
+    READ_STRIP_NOT_STREAM,          // strip must be a stream object
     READ_STRIP_MISSING,             // missing strip entry in xobject dict
-	READ_STRIP_SUBTYPE,				// strip must have /Subtype /Image
-	READ_BITSPERCOMPONENT,			// strip must have /BitsPerComponent with inline unsigned integer value.
+	READ_STRIP_SUBTYPE,				// strip lacks /Subtype or its value isn't /Image
+	READ_STRIP_BITSPERCOMPONENT,	// strip must have /BitsPerComponent with inline unsigned integer value.
 	READ_STRIP_HEIGHT,				// strip must have /Height entry with inline non-negative integer value
 	READ_STRIP_WIDTH,				// strip must have /Width entry with inline non-negative integer value
     READ_STRIP_WIDTH_SAME,          // all strips on a page must have equal /Width values
 	READ_STRIP_COLORSPACE,			// strip must have a /Colorspace entry
-	READ_VALID_COLORSPACE,		    // colorspace must comply with spec
 	READ_STRIP_LENGTH,				// strip must have /Length with non-negative inline integer value
+	READ_VALID_COLORSPACE,		    // colorspace must comply with spec
     READ_ERROR_CODE_COUNT
 } ReadErrorCode;
 
