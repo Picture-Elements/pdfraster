@@ -196,24 +196,55 @@ typedef enum {
     READ_API_NO_SUCH_STRIP,         // function called with strip index that is out-of-range
     READ_STRIP_BUFFER_SIZE,         // strip too big to fit in provided strip buffer.
     READ_INTERNAL_XREF_SIZE,        // internal build/compilation error: sizeof(xref_entry) != 20 bytes
+    READ_INTERNAL_XREF_TABLE,       // internal error - xref table not loaded
     READ_MEMORY_MALLOC,             // malloc returned NULL - insufficient memory (or heap corrupt)
     READ_FILE_EOF_MARKER,           // %%EOF not found near end of file (prob. not a PDF)
     READ_FILE_STARTXREF,            // startxref not found near end of file (so prob. not a PDF)
     READ_FILE_BAD_STARTXREF,        // startxref found - but invalid syntax or value
     READ_FILE_PDFRASTER_TAG,        // %PDF-raster tag not found near end of file
+    READ_FILE_TAG_SOL,              // %PDF-raster tag not at start-of-line
     READ_FILE_BAD_TAG,              // %PDF-raster- not followed by valid <int>.<int><eol>
     READ_FILE_TOO_MAJOR,            // file's PDF-raster major version is above what this library supports.
     READ_FILE_TOO_MINOR,            // this file's PDF-raster minor version is above what this library understands.
-    READ_STRIP_READ,                // reading a strip's data returned less than the expected number of bytes. 
+    READ_LITSTR_EOF,                // end-of-file encountered in literal string (xyz)
+    READ_HEXSTR_CHAR,               // invalid char encountered in hex string
+    READ_XREF,                      // 'xref' keyword not found where expected
+    READ_XREF_HEADER,               // xref keyword not followed by two unsigned integers
+    READ_XREF_OBJECT_ZERO,          // first object in xref table is not object 0.
+    READ_XREF_NUMREFS,              // number of claimed entries in xref table is  < 1 or > 8388607
+    READ_TRAILER,                   // 'trailer' keyword not found where expected (after xref table)
+    READ_TRAILER_DICT,              // trailer dictionary missing or invalid
+    READ_ROOT,                      // /Root entry not found in trailer dictionary
+    READ_CAT_TYPE,                  // catalog must have /Type /Catalog
+    READ_CAT_PAGES,                 // catalog must have a /Pages entry
+    READ_PAGES_COUNT,               // Page tree node doesn't have /Count <integer> where n >= 0
+    READ_PAGE_COUNTS,               // page tree /Count value differs from number of pages found
+    READ_PAGE_TYPE,                 // page node is not a dictionary or lacks a /Type entry
+    READ_PAGE_TYPE2,                // page node /Type isn't /Page or /Pages
+    READ_PAGES_EXTRA,                // more page objects than /Count said in page tree
+    READ_PAGE_KIDS,                 // invalid page node or it lacks a /Kids entry
+    READ_PAGE_KIDS_ARRAY,           // page /Kids array doesn't start with '['
+    READ_PAGE_KIDS_END,             // /Kids array - ']' expected here.
+    READ_PAGE_ROTATION,				// page rotation if present must be an inline non-negative multiple of 90.
+    READ_PAGE_MEDIABOX,				// each page dict must have a /MediaBox entry
+    READ_STRIP_READ,                // reading a strip's data returned less than the expected number of bytes.
+    READ_XREF_TABLE,                // failed reading xref table - invalid file (or file read error?)
+    READ_XREF_ENTRY,                // invalid entry in xref table
+    READ_XREF_ENTRY_ZERO,           // xref table entry 0 must be marked free ('f') with generation 65535
+    READ_XREF_GEN0,                 // xref table entry - in-use object must have generation=0
+    READ_OBJ_DEF,                   // xref entry doesn't point to valid, matching obj definition
     READ_NO_SUCH_XREF,              // indirect object not found in xref table
+    READ_GEN_ZERO,                  // indirect object with generation not 0.
+    READ_DICT_NAME_KEY,             // every dictionary key must be a name (/xyz)
+    READ_DICT_EOF,                  // end-of-file in dictionary. where is the '>>'?
+    READ_DICT_VALUE,                // malformed or missing value in dictionary
     READ_STREAM_CRLF,               // stream keyword followed by CR but then no LF
     READ_STREAM_LINEBREAK,          // stream keyword not followed by CRLF or LF
     READ_STREAM_LENGTH,             // stream dictionary /Length entry not found
     READ_STREAM_LENGTH_INT,         // stream - /Length value isn't an integer literal
     READ_STREAM_ENDSTREAM,          // endstream not found where expected
-    READ_PAGE_TYPE,					// page dict must have /Type /Page
-	READ_PAGE_ROTATION,				// page rotation if present must be an inline non-negative multiple of 90.
-	READ_PAGE_MEDIABOX,				// each page dict must have a /MediaBox entry
+    READ_OBJECT_EOF,                // end-of-file where a PDF value or object was expected
+    READ_OBJECT,                    // expected an object, no object starts with this character
     READ_MEDIABOX_ARRAY,            // MediaBox value must be an array
     READ_MEDIABOX_ELEMENTS,         // MediaBox must contain 4 numbers: [0 0 w h]
 	READ_RESOURCES,					// each page dictionary must have a /Resources entry (that is a dictionary)

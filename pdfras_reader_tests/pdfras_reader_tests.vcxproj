@@ -89,9 +89,12 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="0pages.pdf" />
+    <None Include="arrayjunk.pdf" />
+    <None Include="badxref1.pdf" />
     <None Include="bad_trailer1.pdf" />
     <None Include="badsig1.pdf" />
     <None Include="badsig2.pdf" />
+    <None Include="butnotraster.pdf" />
     <None Include="missing_eofcomment.pdf" />
     <None Include="sample all formats.pdf" />
     <None Include="valid1.pdf" />

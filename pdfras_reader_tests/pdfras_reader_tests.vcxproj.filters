@@ -44,5 +44,14 @@
     <None Include="0pages.pdf">
       <Filter>Sample Files</Filter>
     </None>
+    <None Include="badxref1.pdf">
+      <Filter>Sample Files</Filter>
+    </None>
+    <None Include="butnotraster.pdf">
+      <Filter>Sample Files</Filter>
+    </None>
+    <None Include="arrayjunk.pdf">
+      <Filter>Sample Files</Filter>
+    </None>
   </ItemGroup>
 </Project>

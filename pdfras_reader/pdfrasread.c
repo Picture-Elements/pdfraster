@@ -12,7 +12,8 @@
 ///////////////////////////////////////////////////////////////////////
 // Internal Constants
 
-#define PDFRASREAD_VERSION "0.7.1.0"
+#define PDFRASREAD_VERSION "0.7.2.0"
+// 0.7.2.0  spike   2016.08.21  many more error reports esp. compliance
 // 0.7.1.0  spike   2016.08.18  internal clean-up, fixing failing tests
 // 0.7.0.0  spike   2016.08.17  API change - require a file-size function on create.
 // 0.6.0.0  spike   2016.08.14  moved this history inside the library
@@ -133,9 +134,6 @@ int pdfras_parse_pdfr_tag(const char* tag, int* pmajor, int* pminor)
     assert(tag);
     if (pmajor) *pmajor = 0;
     if (pminor) *pminor = 0;
-	if (tag[-1] != 0x0D && tag[-1] != 0x0A) {
-		return FALSE;
-	}
 	tag += 12;
     {
         int major = 0, minor = 0;
@@ -205,6 +203,15 @@ static void io_error(t_pdfrasreader* reader, int code, pduint32 hint)
     }
 }
 
+static void memory_error(t_pdfrasreader* reader, pduint32 hint)
+{
+    if (VALID(reader)) {
+        reader->error_handler(reader, REPORTING_MEMORY, READ_MEMORY_MALLOC, hint);
+    }
+    else {
+        global_error_handler(NULL, REPORTING_MEMORY, READ_MEMORY_MALLOC, hint);
+    }
+}
 
 static void internal_error(t_pdfrasreader* reader, int code, pduint32 line)
 {
@@ -275,7 +282,8 @@ static size_t pdfras_read_tail(t_pdfrasreader* reader, char* tail, size_t len)
 
 int pdfrasread_recognize_source(t_pdfrasreader* reader, void* source, int* pmajor, int* pminor)
 {
-	char buffer[1024];
+    char head[32+1];
+    char tail[1024+1];
     if (pmajor) *pmajor = -1;
     if (pminor) *pminor = -1;
     if (!VALID(reader)) {
@@ -291,22 +299,31 @@ int pdfrasread_recognize_source(t_pdfrasreader* reader, void* source, int* pmajo
     // temporarily set our source so we can 
     reader->source = source;
     reader->filesize = reader->fsize(reader->source);
-    // check the header, it's quick & easy and we do need
-	// to know that it's some kind of PDF, not just any file
-	if (reader->fread(source, 0, 32, buffer) != 32 ||
-        !pdfras_recognize_pdf_header(buffer)) {
-        // not PDF
-        reader->source = NULL;
-		return FALSE;
-	}
-    int major = 0, minor = 0;
-    size_t tailsize = pdfras_read_tail(reader, buffer, sizeof buffer - 1);
+    // read the header
+    size_t headsize = reader->fread(source, 0, sizeof head-1, head);
+    assert(headsize < sizeof head);
+    head[headsize] = 0;
+    // read the trailer
+    size_t tailsize = pdfras_read_tail(reader, tail, sizeof tail - 1);
+    // OK, we're done reading
     reader->source = NULL;
-    const char* tag = strrstr(buffer, "%PDF-raster-");
-    if (!strrstr(buffer, "%%EOF") ||
-        !tag || tag == buffer ||
+    if (!pdfras_recognize_pdf_header(head)) {
+        // not PDF
+        return FALSE;
+    }
+    if (!strrstr(tail, "%%EOF")) {
+        // probably not a PDF
+        return FALSE;
+    }
+    const char* tag = strrstr(tail, "%PDF-raster-");
+    if (!tag || tag == tail) {
+        return FALSE;
+    }
+    assert(tag > tail);
+    int major = 0, minor = 0;
+    if ((tag[-1] != 0x0D && tag[-1] != 0x0A) ||
         !pdfras_parse_pdfr_tag(tag, &major, &minor)) {
-        // not (valid) PDF, or not (valid) PDF/raster
+        // not (valid) PDF/raster
         return FALSE;
     }
     // Looks like a plausible PDF/raster file with version
@@ -495,9 +512,9 @@ static int token_skip(t_pdfrasreader* reader, pduint32* poff)
 }
 
 // If the next token is the given literal string, skip over it (and following whitespace)
-// and return TRUE.  Otherwise leave the offset at the start of the next token and
+// and return TRUE.  Otherwise leave the offset at the start of the (non-matching) token and
 // return FALSE.  
-static int token_match(t_pdfrasreader* reader, pduint32* poff, const char* lit)
+static int token_eat(t_pdfrasreader* reader, pduint32* poff, const char* lit)
 {
 	// TODO: doesn't handle comments
 	char ch0 = *lit;
@@ -553,6 +570,13 @@ static int token_match(t_pdfrasreader* reader, pduint32* poff, const char* lit)
 	*poff = i + reader->buffer.off;
 	skip_whitespace(reader, poff);
 	return TRUE;
+}
+
+// Peek at the next token - if it matches the given literal string, return TRUE.
+// Otherwise return FALSE.
+static int token_match(t_pdfrasreader* reader, pduint32 off, const char* lit)
+{
+    return token_eat(reader, &off, lit);
 }
 
 static int token_eol(t_pdfrasreader* reader, pduint32 *poff)
@@ -685,6 +709,7 @@ static int token_literal_string(t_pdfrasreader* reader, pduint32* poff)
 			break;
 		case -1:
 			// invalid PDF: unexpected EOF in literal string
+            compliance_error(reader, READ_LITSTR_EOF, *poff);
 			return FALSE;
 		default:
 			break;
@@ -711,6 +736,7 @@ static int token_hex_string(t_pdfrasreader* reader, pduint32* poff)
 		isspace(ch));
 	if (ch != '>') {
 		// unexpected character in hexadecimal string
+        compliance_error(reader, READ_HEXSTR_CHAR, off);
 		return FALSE;
 	}
 	nextch(reader, &off);
@@ -733,6 +759,7 @@ static int xref_lookup(t_pdfrasreader* reader, unsigned num, unsigned gen, pduin
 	}
 	if (!reader->xrefs) {
 		// internal error: no xref table loaded
+        internal_error(reader, READ_INTERNAL_XREF_TABLE, __LINE__);
 		return FALSE;
 	}
 	if (num >= reader->numxrefs) {
@@ -745,10 +772,11 @@ static int xref_lookup(t_pdfrasreader* reader, unsigned num, unsigned gen, pduin
 	unsigned long num2, gen2;
 	if (!token_ulong(reader, &off, &num2) ||
 		!token_ulong(reader, &off, &gen2) ||
-		!token_match(reader, &off, "obj") ||
+		!token_eat(reader, &off, "obj") ||
 		num2 != num ||
 		gen2 != gen) {
 		// invalid PDF: xref table entry doesn't point to object definition
+        compliance_error(reader, READ_OBJ_DEF, off);
 		return FALSE;
 	}
 	// got it, return the position of the stuff inside the object definition:
@@ -769,15 +797,19 @@ static int parse_indirect_reference(t_pdfrasreader* reader, pduint32* poff, pdui
 {
 	pduint32 off = *poff;
 	unsigned long num, gen;
-	if (token_ulong(reader, &off, &num) && token_ulong(reader, &off, &gen) && token_match(reader, &off, "R")) {
+	if (token_ulong(reader, &off, &num) && token_ulong(reader, &off, &gen) && token_eat(reader, &off, "R")) {
 		// indirect object!
+        if (gen != 0) {
+            compliance_error(reader, READ_GEN_ZERO, off);
+        }
 		// and we already parsed it.
 		if (xref_lookup(reader, num, gen, pobjpos)) {
 			*poff = off;
 			return TRUE;
 		}
 		// invalid PDF - referenced object is not in cross-reference table
-	}
+        compliance_error(reader, READ_NO_SUCH_XREF, *poff);
+    }
 	// indirect reference not found
 	return FALSE;
 }
@@ -816,23 +848,25 @@ static int parse_long_value(t_pdfrasreader* reader, pduint32 *poff, long* pvalue
 static int parse_dictionary(t_pdfrasreader* reader, pduint32 *poff)
 {
 	pduint32 off = *poff;
-	if (!token_match(reader, &off, "<<")) {
-		// dictionary malformed
+	if (!token_eat(reader, &off, "<<")) {
+		// not a dictionary - or is mangled
 		return FALSE;
 	}
-	while (!token_match(reader, &off, ">>")) {
+	while (!token_eat(reader, &off, ">>")) {
 		if ('/' != peekch(reader, off)) {
 			// invalid PDF: dictionary key is not a Name
+            compliance_error(reader, READ_DICT_NAME_KEY, off);
 			return FALSE;
 		}
 		// step over key:
 		if (!token_skip(reader, &off)) {
 			// only fails at EOF
+            compliance_error(reader, READ_DICT_EOF, *poff);
 			return FALSE;
 		}
 		// skip over value:
 		if (!object_skip(reader, &off)) {
-			// invalid PDF: dictionary value is missing or malformed
+			// invalid PDF - already logged error
 			return FALSE;
 		}
 	}
@@ -900,7 +934,7 @@ static int parse_dictionary_or_stream(t_pdfrasreader* reader, pduint32 *poff, pd
 	// step over stream data
     pduint32 endstream = off + length;
 	// Parse 'endstream' keyword.
-	if (!token_match(reader, &endstream, "endstream")) {
+	if (!token_eat(reader, &endstream, "endstream")) {
 		// invalid stream: 'endstream' not found where expected.
         // Report error at start of dictionary, it could be wrong /Length,
         // or keywords could be slightly misplaced, or who knows.
@@ -922,13 +956,12 @@ static int parse_array(t_pdfrasreader* reader, pduint32 *poff)
 		// not a valid array
 		return FALSE;
 	}
-	// skip over the opening '['
-	if (nextch(reader, poff) < 0) {
-		return FALSE;
-	}
-	while (!token_match(reader, poff, "]")) {
+	// step over the opening '['
+    nextch(reader, poff);
+	while (!token_eat(reader, poff, "]")) {
 		if (!object_skip(reader, poff)) {
 			// invalid array - unparseable element
+            // error already reported
 			return FALSE;
 		}
 	}
@@ -939,7 +972,7 @@ static int parse_color_space(t_pdfrasreader* reader, pduint32 *poff, unsigned lo
 {
 	// TODO: If stripno == 0, colorspace info should be undefined, ...
 	// If stripno != 0, colorspace info must match what's already set in info
-	if (token_match(reader, poff, "/DeviceGray")) {
+	if (token_eat(reader, poff, "/DeviceGray")) {
 		switch (info->BitsPerComponent) {
 		case 1:
 			info->format = RASREAD_BITONAL;
@@ -955,7 +988,7 @@ static int parse_color_space(t_pdfrasreader* reader, pduint32 *poff, unsigned lo
 			return FALSE;
 		}
 	}
-	else if (token_match(reader, poff, "/DeviceRGB")) {
+	else if (token_eat(reader, poff, "/DeviceRGB")) {
 		switch (info->BitsPerComponent) {
 		case 8:
 			info->format = RASREAD_RGB24;
@@ -968,8 +1001,8 @@ static int parse_color_space(t_pdfrasreader* reader, pduint32 *poff, unsigned lo
 			return FALSE;
 		}
 	}
-	else if (token_match(reader, poff, "[")) {
-		if (token_match(reader, poff, "/CalGray")) {
+	else if (token_eat(reader, poff, "[")) {
+		if (token_eat(reader, poff, "/CalGray")) {
 			// calibrated grayscale
 			switch (info->BitsPerComponent) {
 			case 1:
@@ -986,7 +1019,7 @@ static int parse_color_space(t_pdfrasreader* reader, pduint32 *poff, unsigned lo
 				return FALSE;
 			}
 		}
-		else if (token_match(reader, poff, "/ICCBased")) {
+		else if (token_eat(reader, poff, "/ICCBased")) {
 			switch (info->BitsPerComponent) {
 			case 8:
 				info->format = RASREAD_RGB24;
@@ -1034,7 +1067,7 @@ static int parse_media_box(t_pdfrasreader* reader, pduint32 *poff, double mediab
             return FALSE;
 		}
 	}
-	if (!token_match(reader, &off, "]")) {
+	if (!token_eat(reader, &off, "]")) {
 		// invalid PDF: MediaBox array has more than 4 elements
         compliance_error(reader, READ_MEDIABOX_ARRAY, off);
         return FALSE;
@@ -1058,13 +1091,16 @@ static int parse_media_box(t_pdfrasreader* reader, pduint32 *poff, double mediab
 	return TRUE;
 }
 
-
+// parse and ignore one PDF 'object' - an atomic object
+// or dictionary/stream/array - advance *poff and return TRUE.
+// If it fails, logs a compliance error and returns FALSE.
 static int object_skip(t_pdfrasreader* reader, pduint32 *poff)
 {
 	pduint32 off = *poff;
 	int ch = peekch(reader, off);
 	if (-1 == ch) {
 		// at EOF
+        compliance_error(reader, READ_OBJECT_EOF, *poff);
 		return FALSE;
 	}
 	if (isalpha(ch) ||
@@ -1090,7 +1126,7 @@ static int object_skip(t_pdfrasreader* reader, pduint32 *poff)
 	}
 	if (isdigit(ch)) {
 		unsigned long num, gen;
-		if (token_ulong(reader, &off, &num) && token_ulong(reader, &off, &gen) && token_match(reader, &off, "R")) {
+		if (token_ulong(reader, &off, &num) && token_ulong(reader, &off, &gen) && token_eat(reader, &off, "R")) {
 			// indirect object!
 			// and we already parsed it.
 			*poff = off;
@@ -1102,6 +1138,7 @@ static int object_skip(t_pdfrasreader* reader, pduint32 *poff)
 		}
 	}
 	// Don't know what the h-e-double-hockey-sticks it is.
+    compliance_error(reader, READ_OBJECT, off);
 	return FALSE;
 }
 
@@ -1109,18 +1146,18 @@ static int object_skip(t_pdfrasreader* reader, pduint32 *poff)
 static int dictionary_lookup(t_pdfrasreader* reader, pduint32 off, const char* key, pduint32 *pvalpos)
 {
 	*pvalpos = 0;
-	if (!token_match(reader, &off, "<<")) {
+	if (!token_eat(reader, &off, "<<")) {
 		// invalid dictionary
 		return FALSE;
 	}
-	while (!token_match(reader, &off, ">>")) {
+	while (!token_eat(reader, &off, ">>")) {
 		// does the key element match the key we're looking for?
-		if (token_match(reader, &off, key)) {
+		if (token_eat(reader, &off, key)) {
 			// yes, bingo.
 			// check for indirect reference
 			unsigned long num, gen;
 			pduint32 p = off;
-			if (token_ulong(reader, &p, &num) && token_ulong(reader, &p, &gen) && token_match(reader, &p, "R")) {
+			if (token_ulong(reader, &p, &num) && token_ulong(reader, &p, &gen) && token_eat(reader, &p, "R")) {
 				// indirect object!
 				// and we already parsed it.
 				if (!xref_lookup(reader, num, gen, &off)) {
@@ -1139,6 +1176,7 @@ static int dictionary_lookup(t_pdfrasreader* reader, pduint32 off, const char* k
 		// skip over value element
 		if (!object_skip(reader, &off)) {
 			// invalid dictionary (invalid value)
+            // error already logged.
 			return FALSE;
 		}
 	}
@@ -1150,16 +1188,23 @@ static int dictionary_lookup(t_pdfrasreader* reader, pduint32 off, const char* k
 // TRUE if successful, FALSE otherwise
 static int read_trailer_dict(t_pdfrasreader* reader, pduint32 *poff)
 {
-	if (!token_match(reader, poff, "trailer")) {
+	if (!token_eat(reader, poff, "trailer")) {
 		// PDF/raster restriction: trailer dictionary does not follow xref table.
+        compliance_error(reader, READ_TRAILER, *poff);
 		return FALSE;
 	}
-	return parse_dictionary(reader, poff);
+    if (!parse_dictionary(reader, poff)) {
+        compliance_error(reader, READ_TRAILER_DICT, *poff);
+        return FALSE;
+    }
+    return TRUE;
 }
 
-// check an xref table for anything invalid
+// check an xref table for anything invalid and report the problem.
+// 'off' is the offset in the file of the first entry.
 // return TRUE if valid, FALSE otherwise.
-static int validate_xref_table(t_xref_entry* xrefs, unsigned long numxrefs)
+// In FALSE case, logs pertinent error.
+static int validate_xref_table(t_pdfrasreader* reader, pduint32 off, t_xref_entry* xrefs, unsigned long numxrefs)
 {
 	unsigned long e;
 	// Sweep the xref table, validate entries.
@@ -1176,19 +1221,22 @@ static int validate_xref_table(t_xref_entry* xrefs, unsigned long numxrefs)
 			xrefs[e].status[0] != ' ' ||
 			(xrefs[e].status[1] != 'n' && xrefs[e].status[1] != 'f')) {
 			// invalid xref table entry
-			return FALSE;
+            compliance_error(reader, READ_XREF_ENTRY, off + e * 20);
+            return FALSE;
 		}
 		if (e == 0) {
 			if (xrefs[e].status[1] != 'f' || gen != 65535) {
 				// object 0 must be free with gen=65535
-				return FALSE;
+                compliance_error(reader, READ_XREF_ENTRY_ZERO, off + e * 20);
+                return FALSE;
 			}
 		}
 		else {
 			if (gen != 0 && xrefs[e].status[1] != 'f') {
 				// PDF/raster restriction: in-use object generation must be 0
 				// (free entries can have gen != 0)
-				return FALSE;
+                compliance_error(reader, READ_XREF_GEN0, off + e * 20);
+                return FALSE;
 			}
 		}
 	}
@@ -1197,33 +1245,39 @@ static int validate_xref_table(t_xref_entry* xrefs, unsigned long numxrefs)
 
 // Parse and load the xref table from given offset within the file.
 // Returns TRUE if successful, FALSE for any error.
+// All FALSE cases log a pertinent error.
 static int read_xref_table(t_pdfrasreader* reader, pduint32* poff)
 {
 	pduint32 off = *poff;
 	unsigned long firstnum, numxrefs;
 	t_xref_entry* xrefs = NULL;
-	if (!token_match(reader, &off, "xref")) {
+	if (!token_eat(reader, &off, "xref")) {
 		// invalid xref table
+        compliance_error(reader, READ_XREF, off);
 		return FALSE;
 	}
-	// NB: token_match skips over the whitespace (eol) after "xref"
+	// NB: token_eat skips over the whitespace (eol) after "xref"
 	if (!token_ulong(reader, &off, &firstnum) || !token_ulong(reader, &off, &numxrefs)) {
 		// invalid xref table
+        compliance_error(reader, READ_XREF_HEADER, off);
 		return FALSE;
 	}
 	// And token_ulong skips over trailing whitespace (eol) after 2nd header line
 	if (firstnum != 0) {
 		// invalid PDF/raster: xref table does not start with object 0.
+        compliance_error(reader, READ_XREF_OBJECT_ZERO, *poff);
 		return FALSE;
 	}
 	if (numxrefs < 1 || numxrefs > 8388607) {
 		// looks invalid, at least per PDF 32000-1:2008
+        compliance_error(reader, READ_XREF_NUMREFS, *poff);
 		return FALSE;
 	}
 	size_t xref_size = 20 * numxrefs;
 	xrefs = (t_xref_entry*)malloc(xref_size);
 	if (!xrefs) {
 		// allocation failed
+        memory_error(reader, __LINE__);
 		return FALSE;
 	}
 	// Read all the xref entries straight into memory structure
@@ -1231,13 +1285,16 @@ static int read_xref_table(t_pdfrasreader* reader, pduint32* poff)
 	if (reader->fread(reader->source, off, xref_size, (char*)xrefs) != xref_size) {
 		// invalid PDF, the xref table is cut off
 		free(xrefs);
+        io_error(reader, READ_XREF_TABLE, __LINE__);
+        compliance_error(reader, READ_XREF_TABLE, off);
 		return FALSE;
 	}
-	off += xref_size;
-	if (!validate_xref_table(xrefs, numxrefs)) {
+	if (!validate_xref_table(reader, off, xrefs, numxrefs)) {
+        // already logged the specific issue
 		free(xrefs);
 		return FALSE;
 	}
+	off += xref_size;
 	// OK, attach xref table to reader object:
 	reader->xrefs = xrefs;
 	reader->numxrefs = numxrefs;
@@ -1260,13 +1317,15 @@ static int recursive_page_finder(t_pdfrasreader* reader, pduint32 off, pduint32*
 	// look for the Type key
 	if (!dictionary_lookup(reader, off, "/Type", &p)) {
 		// invalid PDF: page tree node is not a dictionary or lacks a /Type entry
+        compliance_error(reader, READ_PAGE_TYPE, off);
 		return FALSE;
 	}
 	// is it a page (leaf) node?
-	if (token_match(reader, &p, "/Page")) {
+	if (token_eat(reader, &p, "/Page")) {
 		// Found a page object!
 		if (*ppn >= reader->page_count) {
 			// invalid PDF: more page objects than expected in page tree
+            compliance_error(reader, READ_PAGES_EXTRA, p);
 			return FALSE;
 		}
 		// record page object's position, in the page table:
@@ -1275,28 +1334,33 @@ static int recursive_page_finder(t_pdfrasreader* reader, pduint32 off, pduint32*
 		return TRUE;
 	}
 	// is the Type value right for a page tree node?
-	if (!token_match(reader, &p, "/Pages")) {
+	if (!token_eat(reader, &p, "/Pages")) {
 		// invalid PDF: page tree node /Type is not /Pages
+        compliance_error(reader, READ_PAGE_TYPE2, off);
 		return FALSE;
 	}
 	pduint32 kids;
 	if (!dictionary_lookup(reader, off, "/Kids", &kids)) {
 		// invalid PDF: page tree node lacks a /Kids entry
+        compliance_error(reader, READ_PAGE_KIDS, off);
 		return FALSE;
 	}
 	// Enumerate the kids adding their counts to *pcount
-	if (!token_match(reader, &kids, "[")) {
+	if (!token_eat(reader, &kids, "[")) {
+        compliance_error(reader, READ_PAGE_KIDS_ARRAY, kids);
 		return FALSE;
 	}
 	pduint32 kid;
 	while (parse_indirect_reference(reader, &kids, &kid)) {
 		if (!recursive_page_finder(reader, kid, table, ppn)) {
-			// invalid PDF, bad 'kid' entry in page tree
+			// invalid PDF -
+            // (error already reported inside recursive_page_finder)
 			return FALSE;
 		}
 	}
-	if (!token_match(reader, &kids, "]")) {
+	if (!token_eat(reader, &kids, "]")) {
 		// invalid PDF, expected ']' at end of 'kids' array
+        compliance_error(reader, READ_PAGE_KIDS_END, kids);
 		return FALSE;
 	}
 	return TRUE;
@@ -1318,24 +1382,42 @@ static int build_page_table(t_pdfrasreader* reader, pduint32 root)
 	pages = (pduint32*)malloc(ptsize);
 	if (!pages) {
 		// internal failure, mmemory allocation
+        memory_error(reader, __LINE__);
 		return FALSE;
 	}
 	memset(pages, 0, ptsize);
 
 	int pageno = 0;
 	if (!recursive_page_finder(reader, root, pages, &pageno)) {
-		// error
+		// error (already logged)
 		free(pages);				// free the page table
 		return FALSE;
 	}
 	if (pageno != reader->page_count) {
 		// invalid PDF: /Count in root page node is not correct
 		free(pages);				// free the page table
+        compliance_error(reader, READ_PAGE_COUNTS, root);
 		return FALSE;
 	}
 	// keep the filled-in page table
 	reader->page_table = pages;
 	return TRUE;
+}
+
+static int validate_catalog(t_pdfrasreader* reader, pduint32 catpos)
+{
+    pduint32 p;
+    if (!dictionary_lookup(reader, catpos, "/Type", &p)) {
+        // invalid PDF: catalog must have /Type /Catalog
+        compliance_error(reader, READ_CAT_TYPE, catpos);
+        return FALSE;
+    }
+    if (!token_eat(reader, &p, "/Catalog")) {
+        // invalid PDF: catalog must have /Type /Catalog
+        compliance_error(reader, READ_CAT_TYPE, p);
+        return FALSE;
+    }
+    return TRUE;
 }
 
 // Return TRUE if all OK, FALSE if some problem.
@@ -1365,6 +1447,11 @@ static int parse_trailer(t_pdfrasreader* reader)
         compliance_error(reader, READ_FILE_PDFRASTER_TAG, off);
         return FALSE;
     }
+    assert(tag > tail);
+    if (tag[-1] != 0x0D && tag[-1] != 0x0A) {
+        compliance_error(reader, READ_FILE_TAG_SOL, off);
+        return FALSE;
+    }
     // found the %PDF-raster tag
     off += tag - tail;
     if (!pdfras_parse_pdfr_tag(tag, &reader->major, &reader->minor) ||
@@ -1392,7 +1479,7 @@ static int parse_trailer(t_pdfrasreader* reader)
 	// and make a note of it for a bit later.
 	pduint32 startxref_off = off += (startxref - tail);
 	unsigned long xref_off;
-	if (!token_match(reader, &off, "startxref") || !token_ulong(reader, &off, &xref_off)) {
+	if (!token_eat(reader, &off, "startxref") || !token_ulong(reader, &off, &xref_off)) {
 		// startxref not followed by unsigned int
         compliance_error(reader, READ_FILE_BAD_STARTXREF, off);
 		return FALSE;
@@ -1408,42 +1495,42 @@ static int parse_trailer(t_pdfrasreader* reader)
 		// xref table not found or not valid
 		return FALSE;
 	}
-	if (!token_match(reader, &off, "trailer")) {
+	if (!token_eat(reader, &off, "trailer")) {
 		// PDF/raster restriction: trailer dictionary does not follow xref table.
+        compliance_error(reader, READ_TRAILER, off);
 		return FALSE;
 	}
 	// find the address of the Catalog
 	pduint32 catpos;
 	if (!dictionary_lookup(reader, off, "/Root", &catpos)) {
 		// invalid PDF: trailer dictionary must contain /Root entry
+        compliance_error(reader, READ_ROOT, off);
 		return FALSE;
 	}
 	// check the Catalog
-	off = catpos;
-	pduint32 p;
-	if (!dictionary_lookup(reader, off, "/Type", &p)) {
-		// invalid PDF: catalog must have /Type /Catalog
-		return FALSE;
-	}
-	if (!token_match(reader, &p, "/Catalog")) {
-		// invalid PDF: catalog must have /Type /Catalog
-		return FALSE;
-	}
+    if (!validate_catalog(reader, catpos)) {
+        // any errors already logged.
+        return FALSE;
+    }
 	// Find the root node of the page tree
 	pduint32 pages;
-	if (!dictionary_lookup(reader, off, "/Pages", &pages)) {
+	if (!dictionary_lookup(reader, catpos, "/Pages", &pages)) {
 		// invalid PDF: catalog must have a /Pages entry
-		return FALSE;
+        compliance_error(reader, READ_CAT_PAGES, catpos);
+        return FALSE;
 	}
 	// pages points to the root Page Tree Node
-	off = pages;
-	if (!dictionary_lookup(reader, pages, "/Count", &off) || !parse_long_value(reader, &off, &reader->page_count)) {
+	if (!dictionary_lookup(reader, pages, "/Count", &off) ||
+        !parse_long_value(reader, &off, &reader->page_count) ||
+        reader->page_count < 0) {
 		// invalid PDF: root page node does not have valid /Count value
+        compliance_error(reader, READ_PAGES_COUNT, pages);
 		return FALSE;
 	}
 	// walk the page tree locating all the pages
 	if (!build_page_table(reader, pages)) {
 		// oops - something went wrong
+        // any errors were already logged.
 		return FALSE;
 	}
 
@@ -1511,7 +1598,7 @@ static int get_page_info(t_pdfrasreader* reader, int p, t_pdfpageinfo* pinfo)
 	}
 	pinfo->off = page;
 	pduint32 val;
-	if (!dictionary_lookup(reader, page, "/Type", &val) || !token_match(reader, &val, "/Page")) {
+	if (!dictionary_lookup(reader, page, "/Type", &val) || !token_eat(reader, &val, "/Page")) {
 		// bad page object, not marked /Type /Page
 		compliance_error(reader, READ_PAGE_TYPE, page);
 		return FALSE;
@@ -1551,7 +1638,7 @@ static int get_page_info(t_pdfrasreader* reader, int p, t_pdfpageinfo* pinfo)
 	}
 	// Traverse the XObject dictionary collecting strip info
     pduint32 off = xobjects;
-	if (!token_match(reader, &off, "<<")) {
+	if (!token_eat(reader, &off, "<<")) {
 		// invalid PDF: XObject dictionary doesn't start with '<<'
 		compliance_error(reader, READ_XOBJECT_DICT, xobjects);
 		return FALSE;
@@ -1559,7 +1646,7 @@ static int get_page_info(t_pdfrasreader* reader, int p, t_pdfpageinfo* pinfo)
     // scan the /XObject dictionary once, validating entries
     // as /strip<n> and counting total entries
 	int nstrips;				// strip no
-    for (nstrips = 0; !token_match(reader, &off, ">>"); nstrips++) {
+    for (nstrips = 0; !token_eat(reader, &off, ">>"); nstrips++) {
         pduint32 xobj_entry = off;
         if (peekch(reader, off) != '/' ||
             nextch(reader, &off) != 's' ||
@@ -1587,7 +1674,7 @@ static int get_page_info(t_pdfrasreader* reader, int p, t_pdfpageinfo* pinfo)
             return FALSE;
         }
         // indirect ref must point to a dictionary (in fact a stream)
-        if (!token_match(reader, &strip, "<<")) {
+        if (!token_eat(reader, &strip, "<<")) {
             // invalid PDF: strip isn't a dict/stream
             compliance_error(reader, READ_STRIP_DICT, strip);
             return FALSE;
@@ -1606,7 +1693,7 @@ static int get_page_info(t_pdfrasreader* reader, int p, t_pdfpageinfo* pinfo)
         // important note: when dictionary_lookup finds an entry and the
         // entry's value is an indirect reference, it returns the position
         // of the resolved (referenced) object.
-		if (!dictionary_lookup(reader, strip, "/Subtype", &val) || !token_match(reader, &val, "/Image")) {
+		if (!dictionary_lookup(reader, strip, "/Subtype", &val) || !token_eat(reader, &val, "/Image")) {
 			// strip isn't an image?
 			compliance_error(reader, READ_STRIP_SUBTYPE, strip);
 			return FALSE;
@@ -1729,7 +1816,7 @@ t_pdfrasreader* pdfrasread_create(int apiLevel, pdfras_freader readfn, pdfras_fs
 	}
 	t_pdfrasreader* reader = (t_pdfrasreader*)malloc(sizeof(t_pdfrasreader));
     if (!reader) {
-        global_error_handler(NULL, REPORTING_MEMORY, READ_MEMORY_MALLOC, sizeof(t_xref_entry));
+        memory_error(NULL, __LINE__);
         return NULL;
     }
     memset(reader, 0, sizeof *reader);
