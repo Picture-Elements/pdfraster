@@ -181,6 +181,8 @@ size_t pdfrasread_max_strip_size(t_pdfrasreader* reader, int p);
 // the return value will be 0.
 size_t pdfrasread_read_raw_strip(t_pdfrasreader* reader, int p, int s, void* buffer, size_t bufsize);
 
+// Return the compression format of strip s on page p
+RasterCompression pdfrasread_strip_compression(t_pdfrasreader* reader, int p, int s);
 
 // detailed error codes
 // TODO: assign hard codes to all, so they can't change accidentally
@@ -236,6 +238,7 @@ typedef enum {
     READ_NO_SUCH_XREF,              // indirect object not found in xref table
     READ_GEN_ZERO,                  // indirect object with generation not 0.
     READ_DICT_NAME_KEY,             // every dictionary key must be a name (/xyz)
+    READ_DICT_OBJSTM,               // dictionary with /Type /ObjStm  S6.2 P4
     READ_DICT_EOF,                  // end-of-file in dictionary. where is the '>>'?
     READ_DICT_VALUE,                // malformed or missing value in dictionary
     READ_STREAM_CRLF,               // stream keyword followed by CR but then no LF
@@ -255,14 +258,20 @@ typedef enum {
     READ_STRIP_DICT,                // strip must start with a dictionary
     READ_STRIP_NOT_STREAM,          // strip must be a stream object
     READ_STRIP_MISSING,             // missing strip entry in xobject dict
+    READ_STRIP_TYPE_XOBJECT,        // strip /Type is not /XObject [PDF2 8.9.5]
 	READ_STRIP_SUBTYPE,				// strip lacks /Subtype or its value isn't /Image
-	READ_STRIP_BITSPERCOMPONENT,	// strip must have /BitsPerComponent with inline unsigned integer value.
+	READ_STRIP_BITSPERCOMPONENT,	// strip must have /BitsPerComponent value of 1, 8 or 16
 	READ_STRIP_HEIGHT,				// strip must have /Height entry with inline non-negative integer value
 	READ_STRIP_WIDTH,				// strip must have /Width entry with inline non-negative integer value
     READ_STRIP_WIDTH_SAME,          // all strips on a page must have equal /Width values
 	READ_STRIP_COLORSPACE,			// strip must have a /Colorspace entry
 	READ_STRIP_LENGTH,				// strip must have /Length with non-negative inline integer value
 	READ_VALID_COLORSPACE,		    // colorspace must comply with spec
+    READ_CALGRAY_DICT,              // /CalGray not followed by valid CalGray dictionary
+    READ_CALRGB_DICT,               // /CalRGB not followed by valid CalRGB dictionary
+    READ_ICC_PROFILE,               // not a valid ICC Profile stream
+    READ_ICCPROFILE_READ,           // read error while reading ICC Profile data
+    READ_COLORSPACE_ARRAY,          // colorspace array syntax error - missing closing ']'?
     READ_ERROR_CODE_COUNT
 } ReadErrorCode;
 

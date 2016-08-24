@@ -12,7 +12,9 @@
 ///////////////////////////////////////////////////////////////////////
 // Internal Constants
 
-#define PDFRASREAD_VERSION "0.7.2.0"
+#define PDFRASREAD_VERSION "0.7.3.0"
+// 0.7.3.0  spike   2016.08.23  created get_strip_info
+//                              more colorspace parsing
 // 0.7.2.0  spike   2016.08.21  many more error reports esp. compliance
 // 0.7.1.0  spike   2016.08.18  internal clean-up, fixing failing tests
 // 0.7.0.0  spike   2016.08.17  API change - require a file-size function on create.
@@ -59,12 +61,23 @@ typedef struct t_xref_entry {
 	char		eol[2];                     // either <space>LF or CR,LF
 } t_xref_entry;
 
+typedef struct _ICCProfile ICCProfile;
+
+typedef struct t_colorspace {
+    enum { CS_CALGRAY, CS_DEVICEGRAY, CS_CALRGB, CS_DEVICERGB, CS_ICCBASED } style;
+    double				whitePoint[3];
+    double				blackPoint[3];
+    double              gamma;
+    ICCProfile*         piccProfile;
+} t_colorspace;
+
 // All the information about a single page and the image it contains
 typedef struct {
 	pduint32			off;				// offset of page object in file
 	unsigned long		BitsPerComponent;
 	double				MediaBox[4];
 	RasterPixelFormat	format;
+    t_colorspace        cs;                 // colorspace descriptor
 	double				whitePoint[3];
 	double				blackPoint[3];
 	unsigned long		width;
@@ -74,6 +87,20 @@ typedef struct {
 	int					strip_count;		// number of strips in this page
 	size_t				max_strip_size;		// largest (raw) strip size
 } t_pdfpageinfo;
+
+// Everything you ever wanted to know about a strip
+typedef struct {
+    pduint32            pos;                // position of the strip (stream/dict)
+    pduint32            data_pos;           // start offset of actual strip data
+    long                compressed_size;    // size of actual (in-file) strip data
+    RasterCompression   compression;        // image compression
+    RasterPixelFormat   format;
+    t_colorspace        cs;                 // colorspace
+    unsigned long       BitsPerComponent;
+    unsigned long       width;
+    unsigned long       height;             // of this strip
+    size_t              uncompressed_size;  // decompressed raster data size
+} t_pdfstripinfo;
 
 // Structure that represents a PDF/raster byte-stream that is open for reading
 typedef struct t_pdfrasreader {
@@ -254,7 +281,7 @@ static void warning(t_pdfrasreader* reader, int code, pduint32 offset)
 }
 
 // report a failure to comply with the PDF/raster spec, at offset in file
-static void compliance_error(t_pdfrasreader* reader, int code, pduint32 offset)
+static void compliance(t_pdfrasreader* reader, int code, pduint32 offset)
 {
     if (VALID(reader)) {
         reader->error_handler(reader, REPORTING_COMPLIANCE, code, offset);
@@ -709,7 +736,7 @@ static int token_literal_string(t_pdfrasreader* reader, pduint32* poff)
 			break;
 		case -1:
 			// invalid PDF: unexpected EOF in literal string
-            compliance_error(reader, READ_LITSTR_EOF, *poff);
+            compliance(reader, READ_LITSTR_EOF, *poff);
 			return FALSE;
 		default:
 			break;
@@ -736,7 +763,7 @@ static int token_hex_string(t_pdfrasreader* reader, pduint32* poff)
 		isspace(ch));
 	if (ch != '>') {
 		// unexpected character in hexadecimal string
-        compliance_error(reader, READ_HEXSTR_CHAR, off);
+        compliance(reader, READ_HEXSTR_CHAR, off);
 		return FALSE;
 	}
 	nextch(reader, &off);
@@ -776,7 +803,7 @@ static int xref_lookup(t_pdfrasreader* reader, unsigned num, unsigned gen, pduin
 		num2 != num ||
 		gen2 != gen) {
 		// invalid PDF: xref table entry doesn't point to object definition
-        compliance_error(reader, READ_OBJ_DEF, off);
+        compliance(reader, READ_OBJ_DEF, off);
 		return FALSE;
 	}
 	// got it, return the position of the stuff inside the object definition:
@@ -800,7 +827,7 @@ static int parse_indirect_reference(t_pdfrasreader* reader, pduint32* poff, pdui
 	if (token_ulong(reader, &off, &num) && token_ulong(reader, &off, &gen) && token_eat(reader, &off, "R")) {
 		// indirect object!
         if (gen != 0) {
-            compliance_error(reader, READ_GEN_ZERO, off);
+            compliance(reader, READ_GEN_ZERO, off);
         }
 		// and we already parsed it.
 		if (xref_lookup(reader, num, gen, pobjpos)) {
@@ -808,7 +835,7 @@ static int parse_indirect_reference(t_pdfrasreader* reader, pduint32* poff, pdui
 			return TRUE;
 		}
 		// invalid PDF - referenced object is not in cross-reference table
-        compliance_error(reader, READ_NO_SUCH_XREF, *poff);
+        compliance(reader, READ_NO_SUCH_XREF, *poff);
     }
 	// indirect reference not found
 	return FALSE;
@@ -853,19 +880,26 @@ static int parse_dictionary(t_pdfrasreader* reader, pduint32 *poff)
 		return FALSE;
 	}
 	while (!token_eat(reader, &off, ">>")) {
+        // each entry consist of a key (a /name) followed by a value.
 		if ('/' != peekch(reader, off)) {
 			// invalid PDF: dictionary key is not a Name
-            compliance_error(reader, READ_DICT_NAME_KEY, off);
+            compliance(reader, READ_DICT_NAME_KEY, off);
 			return FALSE;
 		}
-		// step over key:
-		if (!token_skip(reader, &off)) {
+        if (token_eat(reader, &off, "/Type")) {
+            // it's the /Type entry of this dictionary/stream
+            if (token_match(reader, off, "/ObjStm")) {
+                // invalid PDF/raster: stream cannot /Type /ObjStm
+                compliance(reader, READ_DICT_OBJSTM, off);
+                return FALSE;
+            }
+        } else if (!token_skip(reader, &off)) {         // skip key
 			// only fails at EOF
-            compliance_error(reader, READ_DICT_EOF, *poff);
+            compliance(reader, READ_DICT_EOF, *poff);
 			return FALSE;
 		}
-		// skip over value:
-		if (!object_skip(reader, &off)) {
+        // parse & skip value
+        if (!object_skip(reader, &off)) {
 			// invalid PDF - already logged error
 			return FALSE;
 		}
@@ -908,12 +942,12 @@ static int parse_dictionary_or_stream(t_pdfrasreader* reader, pduint32 *poff, pd
 	if (ch == 0x0D) {
 		// CR must be followed by LF
 		if (nextch(reader, &off) != 0x0A) {
-            compliance_error(reader, READ_STREAM_CRLF, off);
+            compliance(reader, READ_STREAM_CRLF, off);
 			return FALSE;
 		}
 	} else if (ch != 0x0A) {
 		// Alternative to CRLF is just LF
-        compliance_error(reader, READ_STREAM_LINEBREAK, off);
+        compliance(reader, READ_STREAM_LINEBREAK, off);
 		return FALSE;
 	}
 	// we're positioned at the LF, step over it.
@@ -922,13 +956,13 @@ static int parse_dictionary_or_stream(t_pdfrasreader* reader, pduint32 *poff, pd
     // *poff is still start of dictionary
 	if (!dictionary_lookup(reader, *poff, "/Length", &lenpos)) {
 		// invalid stream: no /Length key in stream dictionary
-        compliance_error(reader, READ_STREAM_LENGTH, *poff);
+        compliance(reader, READ_STREAM_LENGTH, *poff);
 		return FALSE;
 	}
 	long length;
 	if (!parse_long_value(reader, &lenpos, &length) || length < 0) {
         // length isn't a (non-negative) integer
-        compliance_error(reader, READ_STREAM_LENGTH_INT, lenpos);
+        compliance(reader, READ_STREAM_LENGTH_INT, lenpos);
 		return FALSE;
 	}
 	// step over stream data
@@ -938,7 +972,7 @@ static int parse_dictionary_or_stream(t_pdfrasreader* reader, pduint32 *poff, pd
 		// invalid stream: 'endstream' not found where expected.
         // Report error at start of dictionary, it could be wrong /Length,
         // or keywords could be slightly misplaced, or who knows.
-        compliance_error(reader, READ_STREAM_ENDSTREAM, *poff);
+        compliance(reader, READ_STREAM_ENDSTREAM, *poff);
 		return FALSE;
 	}
     // return position and length of stream data:
@@ -968,78 +1002,90 @@ static int parse_array(t_pdfrasreader* reader, pduint32 *poff)
 	return TRUE;
 }
 
-static int parse_color_space(t_pdfrasreader* reader, pduint32 *poff, unsigned long stripno, t_pdfpageinfo *info)
+static int parse_icc_profile(t_pdfrasreader* reader, pduint32 *poff, ICCProfile** ppiccProfile)
+{
+    pduint32 off = *poff;
+    *ppiccProfile = NULL;
+    pduint32 datapos;
+    long datalen;
+    if (!parse_dictionary_or_stream(reader, &off, &datapos, &datalen)) {
+        return FALSE;
+    }
+    *ppiccProfile = (ICCProfile*)malloc((size_t)datalen);
+    if (!*ppiccProfile) {
+        memory_error(reader, __LINE__);
+        return FALSE;
+    }
+    if (reader->fread(reader->source, datapos, datalen, (char*)*ppiccProfile) != datalen) {
+        io_error(reader, READ_ICCPROFILE_READ, __LINE__);
+        free(*ppiccProfile); *ppiccProfile = NULL;
+        return FALSE;
+    }
+    // TODO: validate the data we read is actually an ICC Profile!
+    *poff = off;
+    return TRUE;
+}
+
+static int parse_color_space(t_pdfrasreader* reader, pduint32 *poff, int bitsPerComponent, t_colorspace* pcs)
 {
 	// TODO: If stripno == 0, colorspace info should be undefined, ...
 	// If stripno != 0, colorspace info must match what's already set in info
 	if (token_eat(reader, poff, "/DeviceGray")) {
-		switch (info->BitsPerComponent) {
-		case 1:
-			info->format = RASREAD_BITONAL;
-			break;
-		case 8:
-			info->format = RASREAD_GRAY8;
-			break;
-		case 16:
-			info->format = RASREAD_GRAY16;
-			break;
-		default:
-			// PDF/raster: /DeviceGray image must be 1, 8 or 16 BitsPerComponent
-			return FALSE;
-		}
+        pcs->style = CS_DEVICEGRAY;
 	}
 	else if (token_eat(reader, poff, "/DeviceRGB")) {
-		switch (info->BitsPerComponent) {
-		case 8:
-			info->format = RASREAD_RGB24;
-			break;
-		case 16:
-			info->format = RASREAD_RGB48;
-			break;
-		default:
-			// PDF/raster: /DeviceRGB image must be 8 or 16 BitsPerComponent
-			return FALSE;
-		}
+        pcs->style = CS_DEVICERGB;
 	}
 	else if (token_eat(reader, poff, "[")) {
 		if (token_eat(reader, poff, "/CalGray")) {
-			// calibrated grayscale
-			switch (info->BitsPerComponent) {
-			case 1:
-				info->format = RASREAD_BITONAL;
-				break;
-			case 8:
-				info->format = RASREAD_GRAY8;
-				break;
-			case 16:
-				info->format = RASREAD_GRAY16;
-				break;
-			default:
-				// PDF/raster: /DeviceGray image must be 1, 8 or 16 BitsPerComponent
-				return FALSE;
-			}
-		}
-		else if (token_eat(reader, poff, "/ICCBased")) {
-			switch (info->BitsPerComponent) {
-			case 8:
-				info->format = RASREAD_RGB24;
-				break;
-			case 16:
-				info->format = RASREAD_RGB48;
-				break;
-			default:
-				// PDF/raster: /ICCBased image must be 8 or 16 BitsPerComponent
-				return FALSE;
-			}
-		}
+            pcs->style = CS_CALGRAY;
+            pduint32 dict = *poff;
+            parse_indirect_reference(reader, poff, &dict);
+            // this isn't right if dict is in-line: needs to advance *poff
+            if (!parse_dictionary(reader, &dict)) {
+                compliance(reader, READ_CALGRAY_DICT, dict);
+                return FALSE;
+            }
+        }
+        else if (token_eat(reader, poff, "/CalRGB")) {
+            pcs->style = CS_CALRGB;
+            pduint32 dict = *poff;
+            parse_indirect_reference(reader, poff, &dict);
+            // this isn't right if dict is in-line: needs to advance *poff
+            if (!parse_dictionary(reader, &dict)) {
+                compliance(reader, READ_CALRGB_DICT, dict);
+                return FALSE;
+            }
+        }
+        else if (token_eat(reader, poff, "/ICCBased")) {
+            pcs->style = CS_ICCBASED;
+            pduint32 prof = *poff;
+            // could be an indirect reference
+            parse_indirect_reference(reader, poff, &prof);
+            // this isn't right if dict is in-line: needs to advance *poff
+            if (!parse_icc_profile(reader, &prof, &pcs->piccProfile)) {
+                compliance(reader, READ_ICC_PROFILE, prof);
+                return FALSE;
+            }
+        }
 		else {
 			// missing or unrecognized colorspace type
+            // TODO: more specific error code?
+            compliance(reader, READ_VALID_COLORSPACE, *poff);
 			return FALSE;
 		}
+        if (!token_eat(reader, poff, "]")) {
+            // invalid PDF, expected ']' at end of colorspace array
+            compliance(reader, READ_COLORSPACE_ARRAY, *poff);
+            return FALSE;
+        }
 	}
 	else {
-		// PDF/raster: ColorSpace must be /DeviceGray or /DeviceRGB
-		return FALSE;
+		// PDF/raster: ColorSpace must be /DeviceGray, /DeviceRGB,
+        // CalGray, CalRGB, or ICCBased.
+        // TODO: more specific error code?
+        compliance(reader, READ_VALID_COLORSPACE, *poff);
+        return FALSE;
 	}
 	return TRUE;
 }
@@ -1050,34 +1096,34 @@ static int parse_media_box(t_pdfrasreader* reader, pduint32 *poff, double mediab
 	pduint32 off = *poff;
 	if (peekch(reader, off) != '[') {
         // invalid PDF: bad MediaBox
-        compliance_error(reader, READ_MEDIABOX_ARRAY, off);
+        compliance(reader, READ_MEDIABOX_ARRAY, off);
         return FALSE;
 	}
 	// skip over the opening '['
 	if (nextch(reader, &off) < 0) {
         // invalid PDF: bad MediaBox
-        compliance_error(reader, READ_MEDIABOX_ARRAY, off);
+        compliance(reader, READ_MEDIABOX_ARRAY, off);
         return FALSE;
 	}
 	int i;
 	for (i = 0; i < 4; i++) {
 		if (!parse_number_value(reader, &off, &mediabox[i])) {
 			// invalid PDF: bad MediaBox element
-            compliance_error(reader, READ_MEDIABOX_ELEMENTS, off);
+            compliance(reader, READ_MEDIABOX_ELEMENTS, off);
             return FALSE;
 		}
 	}
 	if (!token_eat(reader, &off, "]")) {
 		// invalid PDF: MediaBox array has more than 4 elements
-        compliance_error(reader, READ_MEDIABOX_ARRAY, off);
+        compliance(reader, READ_MEDIABOX_ARRAY, off);
         return FALSE;
 	}
     if (mediabox[0] != 0 || mediabox[1] != 0) {
-        compliance_error(reader, READ_MEDIABOX_ELEMENTS, off);
+        compliance(reader, READ_MEDIABOX_ELEMENTS, off);
         return FALSE;
     }
     if (mediabox[3] < 0 || mediabox[4] < 0) {
-        compliance_error(reader, READ_MEDIABOX_ELEMENTS, off);
+        compliance(reader, READ_MEDIABOX_ELEMENTS, off);
         return FALSE;
     }
     // normalize rectangle so lower-left corner is actually lower and left etc.
@@ -1100,7 +1146,7 @@ static int object_skip(t_pdfrasreader* reader, pduint32 *poff)
 	int ch = peekch(reader, off);
 	if (-1 == ch) {
 		// at EOF
-        compliance_error(reader, READ_OBJECT_EOF, *poff);
+        compliance(reader, READ_OBJECT_EOF, *poff);
 		return FALSE;
 	}
 	if (isalpha(ch) ||
@@ -1138,7 +1184,7 @@ static int object_skip(t_pdfrasreader* reader, pduint32 *poff)
 		}
 	}
 	// Don't know what the h-e-double-hockey-sticks it is.
-    compliance_error(reader, READ_OBJECT, off);
+    compliance(reader, READ_OBJECT, off);
 	return FALSE;
 }
 
@@ -1162,7 +1208,7 @@ static int dictionary_lookup(t_pdfrasreader* reader, pduint32 off, const char* k
 				// and we already parsed it.
 				if (!xref_lookup(reader, num, gen, &off)) {
 					// invalid PDF - referenced object is not in cross-reference table
-                    compliance_error(reader, READ_NO_SUCH_XREF, off);
+                    compliance(reader, READ_NO_SUCH_XREF, off);
 					return FALSE;
 				}
 			}
@@ -1190,11 +1236,11 @@ static int read_trailer_dict(t_pdfrasreader* reader, pduint32 *poff)
 {
 	if (!token_eat(reader, poff, "trailer")) {
 		// PDF/raster restriction: trailer dictionary does not follow xref table.
-        compliance_error(reader, READ_TRAILER, *poff);
+        compliance(reader, READ_TRAILER, *poff);
 		return FALSE;
 	}
     if (!parse_dictionary(reader, poff)) {
-        compliance_error(reader, READ_TRAILER_DICT, *poff);
+        compliance(reader, READ_TRAILER_DICT, *poff);
         return FALSE;
     }
     return TRUE;
@@ -1221,13 +1267,13 @@ static int validate_xref_table(t_pdfrasreader* reader, pduint32 off, t_xref_entr
 			xrefs[e].status[0] != ' ' ||
 			(xrefs[e].status[1] != 'n' && xrefs[e].status[1] != 'f')) {
 			// invalid xref table entry
-            compliance_error(reader, READ_XREF_ENTRY, off + e * 20);
+            compliance(reader, READ_XREF_ENTRY, off + e * 20);
             return FALSE;
 		}
 		if (e == 0) {
 			if (xrefs[e].status[1] != 'f' || gen != 65535) {
 				// object 0 must be free with gen=65535
-                compliance_error(reader, READ_XREF_ENTRY_ZERO, off + e * 20);
+                compliance(reader, READ_XREF_ENTRY_ZERO, off + e * 20);
                 return FALSE;
 			}
 		}
@@ -1235,7 +1281,7 @@ static int validate_xref_table(t_pdfrasreader* reader, pduint32 off, t_xref_entr
 			if (gen != 0 && xrefs[e].status[1] != 'f') {
 				// PDF/raster restriction: in-use object generation must be 0
 				// (free entries can have gen != 0)
-                compliance_error(reader, READ_XREF_GEN0, off + e * 20);
+                compliance(reader, READ_XREF_GEN0, off + e * 20);
                 return FALSE;
 			}
 		}
@@ -1253,24 +1299,24 @@ static int read_xref_table(t_pdfrasreader* reader, pduint32* poff)
 	t_xref_entry* xrefs = NULL;
 	if (!token_eat(reader, &off, "xref")) {
 		// invalid xref table
-        compliance_error(reader, READ_XREF, off);
+        compliance(reader, READ_XREF, off);
 		return FALSE;
 	}
 	// NB: token_eat skips over the whitespace (eol) after "xref"
 	if (!token_ulong(reader, &off, &firstnum) || !token_ulong(reader, &off, &numxrefs)) {
 		// invalid xref table
-        compliance_error(reader, READ_XREF_HEADER, off);
+        compliance(reader, READ_XREF_HEADER, off);
 		return FALSE;
 	}
 	// And token_ulong skips over trailing whitespace (eol) after 2nd header line
 	if (firstnum != 0) {
 		// invalid PDF/raster: xref table does not start with object 0.
-        compliance_error(reader, READ_XREF_OBJECT_ZERO, *poff);
+        compliance(reader, READ_XREF_OBJECT_ZERO, *poff);
 		return FALSE;
 	}
 	if (numxrefs < 1 || numxrefs > 8388607) {
 		// looks invalid, at least per PDF 32000-1:2008
-        compliance_error(reader, READ_XREF_NUMREFS, *poff);
+        compliance(reader, READ_XREF_NUMREFS, *poff);
 		return FALSE;
 	}
 	size_t xref_size = 20 * numxrefs;
@@ -1286,7 +1332,7 @@ static int read_xref_table(t_pdfrasreader* reader, pduint32* poff)
 		// invalid PDF, the xref table is cut off
 		free(xrefs);
         io_error(reader, READ_XREF_TABLE, __LINE__);
-        compliance_error(reader, READ_XREF_TABLE, off);
+        compliance(reader, READ_XREF_TABLE, off);
 		return FALSE;
 	}
 	if (!validate_xref_table(reader, off, xrefs, numxrefs)) {
@@ -1317,7 +1363,7 @@ static int recursive_page_finder(t_pdfrasreader* reader, pduint32 off, pduint32*
 	// look for the Type key
 	if (!dictionary_lookup(reader, off, "/Type", &p)) {
 		// invalid PDF: page tree node is not a dictionary or lacks a /Type entry
-        compliance_error(reader, READ_PAGE_TYPE, off);
+        compliance(reader, READ_PAGE_TYPE, off);
 		return FALSE;
 	}
 	// is it a page (leaf) node?
@@ -1325,7 +1371,7 @@ static int recursive_page_finder(t_pdfrasreader* reader, pduint32 off, pduint32*
 		// Found a page object!
 		if (*ppn >= reader->page_count) {
 			// invalid PDF: more page objects than expected in page tree
-            compliance_error(reader, READ_PAGES_EXTRA, p);
+            compliance(reader, READ_PAGES_EXTRA, p);
 			return FALSE;
 		}
 		// record page object's position, in the page table:
@@ -1336,18 +1382,18 @@ static int recursive_page_finder(t_pdfrasreader* reader, pduint32 off, pduint32*
 	// is the Type value right for a page tree node?
 	if (!token_eat(reader, &p, "/Pages")) {
 		// invalid PDF: page tree node /Type is not /Pages
-        compliance_error(reader, READ_PAGE_TYPE2, off);
+        compliance(reader, READ_PAGE_TYPE2, off);
 		return FALSE;
 	}
 	pduint32 kids;
 	if (!dictionary_lookup(reader, off, "/Kids", &kids)) {
 		// invalid PDF: page tree node lacks a /Kids entry
-        compliance_error(reader, READ_PAGE_KIDS, off);
+        compliance(reader, READ_PAGE_KIDS, off);
 		return FALSE;
 	}
 	// Enumerate the kids adding their counts to *pcount
 	if (!token_eat(reader, &kids, "[")) {
-        compliance_error(reader, READ_PAGE_KIDS_ARRAY, kids);
+        compliance(reader, READ_PAGE_KIDS_ARRAY, kids);
 		return FALSE;
 	}
 	pduint32 kid;
@@ -1360,11 +1406,11 @@ static int recursive_page_finder(t_pdfrasreader* reader, pduint32 off, pduint32*
 	}
 	if (!token_eat(reader, &kids, "]")) {
 		// invalid PDF, expected ']' at end of 'kids' array
-        compliance_error(reader, READ_PAGE_KIDS_END, kids);
+        compliance(reader, READ_PAGE_KIDS_END, kids);
 		return FALSE;
 	}
 	return TRUE;
-}
+} // recursive_page_finder
 
 // Build the page table by walking the page tree from root.
 // If successful, return TRUE: page table contains offset of each page object.
@@ -1396,7 +1442,7 @@ static int build_page_table(t_pdfrasreader* reader, pduint32 root)
 	if (pageno != reader->page_count) {
 		// invalid PDF: /Count in root page node is not correct
 		free(pages);				// free the page table
-        compliance_error(reader, READ_PAGE_COUNTS, root);
+        compliance(reader, READ_PAGE_COUNTS, root);
 		return FALSE;
 	}
 	// keep the filled-in page table
@@ -1409,12 +1455,12 @@ static int validate_catalog(t_pdfrasreader* reader, pduint32 catpos)
     pduint32 p;
     if (!dictionary_lookup(reader, catpos, "/Type", &p)) {
         // invalid PDF: catalog must have /Type /Catalog
-        compliance_error(reader, READ_CAT_TYPE, catpos);
+        compliance(reader, READ_CAT_TYPE, catpos);
         return FALSE;
     }
     if (!token_eat(reader, &p, "/Catalog")) {
         // invalid PDF: catalog must have /Type /Catalog
-        compliance_error(reader, READ_CAT_TYPE, p);
+        compliance(reader, READ_CAT_TYPE, p);
         return FALSE;
     }
     return TRUE;
@@ -1429,7 +1475,7 @@ static int parse_trailer(t_pdfrasreader* reader)
     const char* eof = strrstr(tail, "%%EOF");
     if (!eof) {
         // invalid PDF - %%EOF not found in tail of file.
-        compliance_error(reader, READ_FILE_EOF_MARKER, off);
+        compliance(reader, READ_FILE_EOF_MARKER, off);
         return FALSE;
     }
     // we need to find the startxref anyway, let's check now,
@@ -1437,19 +1483,19 @@ static int parse_trailer(t_pdfrasreader* reader)
     const char* startxref = strrstr(tail, "startxref");
     if (!startxref) {
         // invalid PDF - startxref not found in tail of file.
-        compliance_error(reader, READ_FILE_STARTXREF, off);
+        compliance(reader, READ_FILE_STARTXREF, off);
         return FALSE;
     }
     // find the PDF/raster 'tag'
     const char* tag = strrstr(tail, "%PDF-raster-");
     if (!tag || tag == tail) {
         // PDF/raster marker not found in tail of file
-        compliance_error(reader, READ_FILE_PDFRASTER_TAG, off);
+        compliance(reader, READ_FILE_PDFRASTER_TAG, off);
         return FALSE;
     }
     assert(tag > tail);
     if (tag[-1] != 0x0D && tag[-1] != 0x0A) {
-        compliance_error(reader, READ_FILE_TAG_SOL, off);
+        compliance(reader, READ_FILE_TAG_SOL, off);
         return FALSE;
     }
     // found the %PDF-raster tag
@@ -1457,14 +1503,14 @@ static int parse_trailer(t_pdfrasreader* reader)
     if (!pdfras_parse_pdfr_tag(tag, &reader->major, &reader->minor) ||
         reader->major < 1 ||
         reader->minor < 0) {
-        compliance_error(reader, READ_FILE_BAD_TAG, off);
+        compliance(reader, READ_FILE_BAD_TAG, off);
 		return FALSE;
 	}
     // point specifically to the x.y part of the tag
     off += 12;
     if (reader->major > RASREAD_MAX_MAJOR) {
         // beyond us, we can't handle it.
-        compliance_error(reader, READ_FILE_TOO_MAJOR, off);
+        compliance(reader, READ_FILE_TOO_MAJOR, off);
         return FALSE;
     }
     if (reader->major == RASREAD_MAX_MAJOR && reader->minor > RASREAD_MAX_MINOR) {
@@ -1481,12 +1527,12 @@ static int parse_trailer(t_pdfrasreader* reader)
 	unsigned long xref_off;
 	if (!token_eat(reader, &off, "startxref") || !token_ulong(reader, &off, &xref_off)) {
 		// startxref not followed by unsigned int
-        compliance_error(reader, READ_FILE_BAD_STARTXREF, off);
+        compliance(reader, READ_FILE_BAD_STARTXREF, off);
 		return FALSE;
 	}
 	if (xref_off < 16 || xref_off >= reader->filesize) {
 		// invalid PDF - offset to xref table is bogus
-        compliance_error(reader, READ_FILE_BAD_STARTXREF, off);
+        compliance(reader, READ_FILE_BAD_STARTXREF, off);
         return FALSE;
 	}
 	// go there and read the xref table
@@ -1497,14 +1543,14 @@ static int parse_trailer(t_pdfrasreader* reader)
 	}
 	if (!token_eat(reader, &off, "trailer")) {
 		// PDF/raster restriction: trailer dictionary does not follow xref table.
-        compliance_error(reader, READ_TRAILER, off);
+        compliance(reader, READ_TRAILER, off);
 		return FALSE;
 	}
 	// find the address of the Catalog
 	pduint32 catpos;
 	if (!dictionary_lookup(reader, off, "/Root", &catpos)) {
 		// invalid PDF: trailer dictionary must contain /Root entry
-        compliance_error(reader, READ_ROOT, off);
+        compliance(reader, READ_ROOT, off);
 		return FALSE;
 	}
 	// check the Catalog
@@ -1516,7 +1562,7 @@ static int parse_trailer(t_pdfrasreader* reader)
 	pduint32 pages;
 	if (!dictionary_lookup(reader, catpos, "/Pages", &pages)) {
 		// invalid PDF: catalog must have a /Pages entry
-        compliance_error(reader, READ_CAT_PAGES, catpos);
+        compliance(reader, READ_CAT_PAGES, catpos);
         return FALSE;
 	}
 	// pages points to the root Page Tree Node
@@ -1524,7 +1570,7 @@ static int parse_trailer(t_pdfrasreader* reader)
         !parse_long_value(reader, &off, &reader->page_count) ||
         reader->page_count < 0) {
 		// invalid PDF: root page node does not have valid /Count value
-        compliance_error(reader, READ_PAGES_COUNT, pages);
+        compliance(reader, READ_PAGES_COUNT, pages);
 		return FALSE;
 	}
 	// walk the page tree locating all the pages
@@ -1562,10 +1608,122 @@ static double tweak_dpi(double dpi)
 	return dpi;
 }
 
-static int decode_strip_format(t_pdfrasreader* reader, pduint32* poff, unsigned long bpc, RasterPixelFormat* pformat)
+// Look up strip s in page p and return the offset of that strip-stream
+static int find_strip(t_pdfrasreader* reader, int p, int s, pduint32* pstrip)
 {
-	return TRUE;
-}
+    // look up the file position of the nth page object:
+    pduint32 page = get_page_pos(reader, p);
+    if (!page) {
+        api_error(reader, READ_API_NO_SUCH_PAGE, __LINE__);
+        return FALSE;
+    }
+    pduint32 resdict;
+    if (!dictionary_lookup(reader, page, "/Resources", &resdict)) {
+        // bad page object, no /Resources entry
+        compliance(reader, READ_RESOURCES, page);
+        return FALSE;
+    }
+    // In the Resources dictionary find the XObject dictionary
+    pduint32 xobjects;
+    if (!dictionary_lookup(reader, resdict, "/XObject", &xobjects)) {
+        // bad resource dictionary, no /XObject entry
+        compliance(reader, READ_XOBJECT, resdict);
+        return FALSE;
+    }
+
+    char stripname[32];
+    sprintf(stripname, "/strip%d", s);
+    if (!dictionary_lookup(reader, xobjects, stripname, pstrip)) {
+        // strip not found in XObject dictionary
+        api_error(reader, READ_API_NO_SUCH_STRIP, __LINE__);
+        return FALSE;
+    }
+    return TRUE;
+} // find_strip
+
+// return all the info about strip s on page p of an open file
+static int get_strip_info(t_pdfrasreader* reader, int p, int s, t_pdfstripinfo* pinfo)
+{
+    // While this is not a public function, it is called by a bunch of
+    // shallow public functions - that's why it reports API errors.
+    if (!VALID(reader)) {
+        api_error(NULL, READ_API_BAD_READER, __LINE__);
+        return FALSE;
+    }
+    if (!pinfo) {
+        api_error(reader, READ_API_NULL_PARAM, __LINE__);
+        return FALSE;
+    }
+    if (!reader->bOpen) {
+        api_error(reader, READ_API_NOT_OPEN, __LINE__);
+        return FALSE;
+    }
+    // clear info to all 0's
+    memset(pinfo, 0, sizeof *pinfo);
+    // find the strip
+    if (!find_strip(reader, p, s, &pinfo->pos)) {
+        // no such strip - already reported appropriate error
+        return FALSE;
+    }
+    // Parse the strip stream and locate its data
+    // Among other things, this finds and checks the /Length key
+    pduint32 pos = pinfo->pos;
+    if (!parse_dictionary_or_stream(reader, &pos, &pinfo->data_pos, &pinfo->compressed_size)) {
+        // strip stream not found or invalid
+        // compliance errors have already been reported
+        return FALSE;
+    }
+    if (pinfo->pos == 0 || pinfo->compressed_size == 0) {
+        // dictionary, but not a stream!
+        compliance(reader, READ_STRIP_NOT_STREAM, pinfo->pos);
+        return FALSE;
+    }
+    pduint32 val;
+    // /Type entry is optional, but if present value must be /XObject   [ISO 32000 8.9.5]
+    if (dictionary_lookup(reader, pinfo->pos, "/Type", &val) && !token_match(reader, val, "/XObject")) {
+        compliance(reader, READ_STRIP_TYPE_XOBJECT, pinfo->pos);
+        return FALSE;
+    }
+    // /Subtype is mandatory and must have value /Image
+    if (!dictionary_lookup(reader, pinfo->pos, "/Subtype", &val) || !token_eat(reader, &val, "/Image")) {
+        // strip isn't /Subtype /Image
+        compliance(reader, READ_STRIP_SUBTYPE, pinfo->pos);
+        return FALSE;
+    }
+    // /BitsPerComponent is required (for our kind of images) and must be 1,8 or 16
+    if (!dictionary_lookup(reader, pinfo->pos, "/BitsPerComponent", &val) ||
+        !token_ulong(reader, &val, &pinfo->BitsPerComponent) ||
+        (pinfo->BitsPerComponent != 1 && pinfo->BitsPerComponent != 8 && pinfo->BitsPerComponent != 16)) {
+        // strip doesn't have valid BitsPerComponent?
+        compliance(reader, READ_STRIP_BITSPERCOMPONENT, pinfo->pos);
+        return FALSE;
+    }
+    // /Width is mandatory
+    if (!dictionary_lookup(reader, pinfo->pos, "/Width", &val) || !token_ulong(reader, &val, &pinfo->width)) {
+        // strip doesn't have Width?
+        compliance(reader, READ_STRIP_WIDTH, pinfo->pos);
+        return FALSE;
+    }
+    // /Height is mandatory
+    if (!dictionary_lookup(reader, pinfo->pos, "/Height", &val) || !token_ulong(reader, &val, &pinfo->height)) {
+        // strip doesn't have /Height with non-negative integer value
+        compliance(reader, READ_STRIP_HEIGHT, pinfo->pos);
+        return FALSE;
+    }
+    if (!dictionary_lookup(reader, pinfo->pos, "/ColorSpace", &val)) {
+        // PDF/raster: image object, each strip must have a named ColorSpace
+        compliance(reader, READ_STRIP_COLORSPACE, pinfo->pos);
+        return FALSE;
+    }
+    // That's all the mandatory entries!
+    if (!parse_color_space(reader, &val, s, &pinfo->cs)) {
+        // PDF/raster: invalid color space in strip
+        compliance(reader, READ_VALID_COLORSPACE, val);
+        return FALSE;
+    }
+
+    return TRUE;
+} // get_strip_info
 
 // return all the info about page p of the open file.
 static int get_page_info(t_pdfrasreader* reader, int p, t_pdfpageinfo* pinfo)
@@ -1600,7 +1758,7 @@ static int get_page_info(t_pdfrasreader* reader, int p, t_pdfpageinfo* pinfo)
 	pduint32 val;
 	if (!dictionary_lookup(reader, page, "/Type", &val) || !token_eat(reader, &val, "/Page")) {
 		// bad page object, not marked /Type /Page
-		compliance_error(reader, READ_PAGE_TYPE, page);
+		compliance(reader, READ_PAGE_TYPE, page);
 		return FALSE;
 	}
 	// a page may be rotated for rendering, by a non-negative
@@ -1610,14 +1768,14 @@ static int get_page_info(t_pdfrasreader* reader, int p, t_pdfpageinfo* pinfo)
 		unsigned long angle;
 		if (!token_ulong(reader, &val, &angle) ||
 			angle % 90 != 0) {
-			compliance_error(reader, READ_PAGE_ROTATION, val);
+			compliance(reader, READ_PAGE_ROTATION, val);
 			return FALSE;
 		}
 		pinfo->rotation = angle % 360;
 	}
 	// similarly for mediabox
 	if (!dictionary_lookup(reader, page, "/MediaBox", &val)) {
-		compliance_error(reader, READ_PAGE_MEDIABOX, page);
+		compliance(reader, READ_PAGE_MEDIABOX, page);
 		return FALSE;
 	}
     if (!parse_media_box(reader, &val, pinfo->MediaBox)) {
@@ -1626,21 +1784,21 @@ static int get_page_info(t_pdfrasreader* reader, int p, t_pdfpageinfo* pinfo)
     pduint32 resdict;
 	if (!dictionary_lookup(reader, page, "/Resources", &resdict)) {
 		// bad page object, no /Resources entry
-		compliance_error(reader, READ_RESOURCES, page);
+		compliance(reader, READ_RESOURCES, page);
 		return FALSE;
 	}
 	// In the Resources dictionary find the XObject dictionary
 	pduint32 xobjects;
 	if (!dictionary_lookup(reader, resdict, "/XObject", &xobjects)) {
 		// bad resource dictionary, no /XObject entry
-		compliance_error(reader, READ_XOBJECT, resdict);
+		compliance(reader, READ_XOBJECT, resdict);
 		return FALSE;
 	}
 	// Traverse the XObject dictionary collecting strip info
     pduint32 off = xobjects;
 	if (!token_eat(reader, &off, "<<")) {
 		// invalid PDF: XObject dictionary doesn't start with '<<'
-		compliance_error(reader, READ_XOBJECT_DICT, xobjects);
+		compliance(reader, READ_XOBJECT_DICT, xobjects);
 		return FALSE;
 	}
     // scan the /XObject dictionary once, validating entries
@@ -1657,93 +1815,43 @@ static int get_page_info(t_pdfrasreader* reader, int p, t_pdfpageinfo* pinfo)
             !isdigit(nextch(reader, &off))
             ) {
             // illegal entry in xobjects dictionary - only /strip<n> allowed
-            compliance_error(reader, READ_XOBJECT_ENTRY, xobj_entry);
+            compliance(reader, READ_XOBJECT_ENTRY, xobj_entry);
             return FALSE;
         }
         unsigned long stripno;
         if (!token_ulong(reader, &off, &stripno)) {
             // PDF/raster: strips must be named /strip0, /strip1, /strip2, etc.
-            compliance_error(reader, READ_XOBJECT_ENTRY, off);
+            compliance(reader, READ_XOBJECT_ENTRY, off);
             return FALSE;
         }
         // value of the strip<n> entry must be indirect ref
         pduint32 strip;
         if (!parse_indirect_reference(reader, &off, &strip)) {
             // invalid PDF: strip entry in XObject dict isn't an indirect reference
-            compliance_error(reader, READ_STRIP_REF, off);
-            return FALSE;
-        }
-        // indirect ref must point to a dictionary (in fact a stream)
-        if (!token_eat(reader, &strip, "<<")) {
-            // invalid PDF: strip isn't a dict/stream
-            compliance_error(reader, READ_STRIP_DICT, strip);
+            compliance(reader, READ_STRIP_REF, off);
             return FALSE;
         }
     }
     // then look up strips 0..nstrips-1 to make sure they are all present
     for (int stripno = 0; stripno < nstrips; stripno++) {
-        pduint32 strip;
-        char stripname[32];
-        sprintf(stripname, "/strip%d", stripno);
-        if (!dictionary_lookup(reader, xobjects, stripname, &strip)) {
-            // strip not found in XObject dictionary
-            compliance_error(reader, READ_STRIP_MISSING, xobjects);
+        t_pdfstripinfo strip;
+        if (!get_strip_info(reader, p, stripno, &strip)) {
+            // errors already logged
             return FALSE;
         }
-        // important note: when dictionary_lookup finds an entry and the
-        // entry's value is an indirect reference, it returns the position
-        // of the resolved (referenced) object.
-		if (!dictionary_lookup(reader, strip, "/Subtype", &val) || !token_eat(reader, &val, "/Image")) {
-			// strip isn't an image?
-			compliance_error(reader, READ_STRIP_SUBTYPE, strip);
-			return FALSE;
-		}
-		if (!dictionary_lookup(reader, strip, "/BitsPerComponent", &val) || !token_ulong(reader, &val, &pinfo->BitsPerComponent)) {
-			// strip doesn't have BitsPerComponent?
-			compliance_error(reader, READ_STRIP_BITSPERCOMPONENT, strip);
-			return FALSE;
-		}
-		unsigned long strip_height;
-		if (!dictionary_lookup(reader, strip, "/Height", &val) || !token_ulong(reader, &val, &strip_height)) {
-			// strip doesn't have /Height with non-negative integer value
-			compliance_error(reader, READ_STRIP_HEIGHT, strip);
-			return FALSE;
-		}
 		// page height is sum of strip heights
-		pinfo->height += strip_height;
+        pinfo->height += strip.height;
 		// get/check strip width
-		unsigned long width;
-		if (!dictionary_lookup(reader, strip, "/Width", &val) || !token_ulong(reader, &val, &width)) {
-			// strip doesn't have Width?
-			compliance_error(reader, READ_STRIP_WIDTH, strip);
-			return FALSE;
-		}
 		if (stripno == 0) {
-			pinfo->width = width;
+			pinfo->width = strip.width;
 		}
-		else {
+		else if (pinfo->width != strip.width) {
 			// all strips on a page must have the same width
-            compliance_error(reader, READ_STRIP_WIDTH_SAME, strip);
+            compliance(reader, READ_STRIP_WIDTH_SAME, strip.pos);
             return FALSE;
         }
-		if (!dictionary_lookup(reader, strip, "/ColorSpace", &val)) {
-			// PDF/raster: image object, each strip must have a named ColorSpace
-			compliance_error(reader, READ_STRIP_COLORSPACE, strip);
-			return FALSE;
-		}
-		if (!parse_color_space(reader, &val, stripno, pinfo)) {
-			// PDF/raster: invalid color space in strip
-			compliance_error(reader, READ_VALID_COLORSPACE, val);
-			return FALSE;
-		}
 		// max_strip_size is (surprise) the maximum of the strip sizes (in bytes)
-		long strip_size;
-		if (!dictionary_lookup(reader, strip, "/Length", &val) || !parse_long_value(reader, &val, &strip_size)) {
-			// invalid PDF: strip image must have /Length
-			compliance_error(reader, READ_STRIP_LENGTH, strip);
-			return FALSE;
-		}
-		pinfo->max_strip_size = ulmax(pinfo->max_strip_size, (unsigned long)strip_size);
+		pinfo->max_strip_size = ulmax(pinfo->max_strip_size, (unsigned long)strip.uncompressed_size);
 		// found a valid strip, count it
 		pinfo->strip_count++;
 	} // for each strip
@@ -1751,39 +1859,6 @@ static int get_page_info(t_pdfrasreader* reader, int p, t_pdfpageinfo* pinfo)
 	pinfo->xdpi = tweak_dpi(pinfo->width * 72.0 / (pinfo->MediaBox[2] - pinfo->MediaBox[0]));
 	pinfo->ydpi = tweak_dpi(pinfo->height * 72.0 / (pinfo->MediaBox[3] - pinfo->MediaBox[1]));
 	return TRUE;
-}
-
-// Look up strip s in page p and return the offset of that strip-stream
-static int find_strip(t_pdfrasreader* reader, int p, int s, pduint32* pstrip)
-{
-    // look up the file position of the nth page object:
-    pduint32 page = get_page_pos(reader, p);
-    if (!page) {
-        api_error(reader, READ_API_NO_SUCH_PAGE, __LINE__);
-        return FALSE;
-    }
-    pduint32 resdict;
-    if (!dictionary_lookup(reader, page, "/Resources", &resdict)) {
-        // bad page object, no /Resources entry
-        compliance_error(reader, READ_RESOURCES, page);
-        return FALSE;
-    }
-    // In the Resources dictionary find the XObject dictionary
-    pduint32 xobjects;
-    if (!dictionary_lookup(reader, resdict, "/XObject", &xobjects)) {
-        // bad resource dictionary, no /XObject entry
-        compliance_error(reader, READ_XOBJECT, resdict);
-        return FALSE;
-    }
-
-    char stripname[32];
-    sprintf(stripname, "/strip%d", s);
-    if (!dictionary_lookup(reader, xobjects, stripname, pstrip)) {
-        // strip not found in XObject dictionary
-        api_error(reader, READ_API_NO_SUCH_STRIP, __LINE__);
-        return FALSE;
-    }
-    return TRUE;
 }
 
 // internal function that just passes an error through the (settable) global error handler.
@@ -1953,41 +2028,34 @@ size_t pdfrasread_max_strip_size(t_pdfrasreader* reader, int p)
 // A return value of 0 indicates an error.
 size_t pdfrasread_read_raw_strip(t_pdfrasreader* reader, int p, int s, void* buffer, size_t bufsize)
 {
-    if (!VALID(reader)) {
-        api_error(NULL, READ_API_BAD_READER, __LINE__);
+    t_pdfstripinfo strip;
+    if (!get_strip_info(reader, p, s, &strip)) {
+        // error already reported.
         return 0;
     }
-    // find the strip
-    pduint32 strip;
-    if (!find_strip(reader, p, s, &strip)) {
-        // invalid strip request
-        return 0;
-    }
-    // Parse the strip stream and find the position & length of its data
-    pduint32 pos;
-    long length;
-    if (!parse_dictionary_or_stream(reader, &strip, &pos, &length)) {
-        // strip stream not found or invalid
-        // compliance errors have already been reported
-        return 0;
-    }
-    if (pos == 0 || length == 0) {
-        // dictionary, but not a stream!
-        compliance_error(reader, READ_STRIP_NOT_STREAM, strip);
-        return 0;
-    }
-    if ((unsigned)length > bufsize) {
+    size_t length = strip.compressed_size;
+    if (length > bufsize) {
         // invalid strip request, strip does not fit in buffer
         api_error(reader, READ_STRIP_BUFFER_SIZE, length);
         return 0;
     }
-    if (reader->fread(reader->source, pos, length, buffer) != length) {
+    if (reader->fread(reader->source, strip.data_pos, length, buffer) != length) {
         // read error, unable to read all of strip data
         io_error(reader, READ_STRIP_READ, s);
         return 0;
     }
     return length;
 }
+
+RasterCompression pdfrasread_strip_compression(t_pdfrasreader* reader, int p, int s)
+{
+    t_pdfstripinfo strip;
+    if (!get_strip_info(reader, p, s, &strip)) {
+        return RASREAD_COMPRESSION_NULL;
+    }
+    return strip.compression;
+}
+
 
 int pdfrasread_default_error_handler(t_pdfrasreader* reader, int level, int code, pduint32 offset)
 {
