@@ -158,6 +158,11 @@ int pdfrasread_page_count(t_pdfrasreader* reader);
 // Similar restrictions as pdfrasread_page_count.
 RasterPixelFormat pdfrasread_page_format(t_pdfrasreader* reader, int n);
 
+// Return the bits per component of page n.
+// This is 1 for bitonal images, and either 8 or 16 for grayscale and color.
+// Returns 0 in case of error.
+int pdfrasread_page_bits_per_component(t_pdfrasreader* reader, int n);
+
 // Return the pixel width of the raster image of page n
 int pdfrasread_page_width(t_pdfrasreader* reader, int n);
 
@@ -168,7 +173,8 @@ int pdfrasread_page_height(t_pdfrasreader* reader, int n);
 double pdfrasread_page_horizontal_dpi(t_pdfrasreader* reader, int n);
 double pdfrasread_page_vertical_dpi(t_pdfrasreader* reader, int n);
 
-// Return the clockwise rotation in degrees to be applied to page n
+// Return the clockwise rotation in degrees to be applied to page n.
+// Returns 0 in case of error.
 int pdfrasread_page_rotation(t_pdfrasreader* reader, int n);
 
 // Strip-level access
@@ -265,10 +271,13 @@ typedef enum {
     READ_STRIP_TYPE_XOBJECT,        // strip /Type is not /XObject [PDF2 8.9.5]
 	READ_STRIP_SUBTYPE,				// strip lacks /Subtype or its value isn't /Image
 	READ_STRIP_BITSPERCOMPONENT,	// strip must have /BitsPerComponent value of 1, 8 or 16
+    READ_STRIP_CS_BPC,              // invalid combination of /ColorSpace and /BitsPerComponent in strip
 	READ_STRIP_HEIGHT,				// strip must have /Height entry with inline non-negative integer value
 	READ_STRIP_WIDTH,				// strip must have /Width entry with inline non-negative integer value
     READ_STRIP_WIDTH_SAME,          // all strips on a page must have equal /Width values
-	READ_STRIP_COLORSPACE,			// strip must have a /Colorspace entry
+    READ_STRIP_FORMAT_SAME,         // all strips on a page must have the same pixel format
+    READ_STRIP_DEPTH_SAME,          // all strips on a page must have the same pixel format
+    READ_STRIP_COLORSPACE,			// strip must have a /Colorspace entry
 	READ_STRIP_LENGTH,				// strip must have /Length with non-negative inline integer value
 	READ_VALID_COLORSPACE,		    // colorspace must comply with spec
     READ_CALGRAY_DICT,              // /CalGray not followed by valid CalGray dictionary

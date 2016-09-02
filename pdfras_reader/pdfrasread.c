@@ -12,7 +12,8 @@
 ///////////////////////////////////////////////////////////////////////
 // Internal Constants
 
-#define PDFRASREAD_VERSION "0.7.4.0"
+#define PDFRASREAD_VERSION "0.7.5.0"
+// 0.7.5.0  spike   2016.09.02  pixel format and bits_per_component working (again)
 // 0.7.4.0  spike   2016.09.01  more colorspace parsing (/CalGray)
 // 0.7.3.0  spike   2016.08.23  created get_strip_info
 //                              more colorspace parsing
@@ -93,14 +94,13 @@ typedef struct {
 typedef struct {
     pduint32            pos;                // position of the strip (stream/dict)
     pduint32            data_pos;           // start offset of actual strip data
-    long                compressed_size;    // size of actual (in-file) strip data
+    long                raw_size;           // size of actual (in-file) strip data
     RasterCompression   compression;        // image compression
     RasterPixelFormat   format;
     t_colorspace        cs;                 // colorspace
     unsigned long       BitsPerComponent;
     unsigned long       width;
     unsigned long       height;             // of this strip
-    size_t              uncompressed_size;  // decompressed raster data size
 } t_pdfstripinfo;
 
 // Structure that represents a PDF/raster byte-stream that is open for reading
@@ -1720,6 +1720,39 @@ static int find_strip(t_pdfrasreader* reader, int p, int s, pduint32* pstrip)
     return TRUE;
 } // find_strip
 
+// Given a colorspace and a bit depth (per component), infer and return the "pixel format".
+// Returns RASREAD_FORMAT_NULL on error - up to caller to report the problem.
+static RasterPixelFormat infer_pixel_format(t_colorspace cs, int depth)
+{
+    RasterPixelFormat format = RASREAD_FORMAT_NULL;
+    //CS_CALGRAY, CS_DEVICEGRAY, CS_CALRGB, CS_DEVICERGB, CS_ICCBASED
+    switch (cs.style) {
+    case CS_CALGRAY:
+    case CS_DEVICEGRAY:
+        if (depth == 1) {
+            format = RASREAD_BITONAL;
+        }
+        else if (depth == 8) {
+            format = RASREAD_GRAY8;
+        }
+        else if (depth == 16) {
+            format = RASREAD_GRAY16;
+        }
+        break;
+    case CS_CALRGB:
+    case CS_DEVICERGB:
+    case CS_ICCBASED:
+        if (depth == 8) {
+            format = RASREAD_RGB24;
+        }
+        else if (depth == 16) {
+            format = RASREAD_RGB48;
+        }
+        break;
+    } // switch
+    return format;
+}
+
 // return all the info about strip s on page p of an open file
 static int get_strip_info(t_pdfrasreader* reader, int p, int s, t_pdfstripinfo* pinfo)
 {
@@ -1747,12 +1780,12 @@ static int get_strip_info(t_pdfrasreader* reader, int p, int s, t_pdfstripinfo* 
     // Parse the strip stream and locate its data
     // Among other things, this finds and checks the /Length key
     pduint32 pos = pinfo->pos;
-    if (!parse_dictionary_or_stream(reader, &pos, &pinfo->data_pos, &pinfo->compressed_size)) {
+    if (!parse_dictionary_or_stream(reader, &pos, &pinfo->data_pos, &pinfo->raw_size)) {
         // strip stream not found or invalid
         // compliance errors have already been reported
         return FALSE;
     }
-    if (pinfo->pos == 0 || pinfo->compressed_size == 0) {
+    if (pinfo->pos == 0 || pinfo->raw_size == 0) {
         // dictionary, but not a stream!
         compliance(reader, READ_STRIP_NOT_STREAM, pinfo->pos);
         return FALSE;
@@ -1798,6 +1831,12 @@ static int get_strip_info(t_pdfrasreader* reader, int p, int s, t_pdfstripinfo* 
     if (!parse_color_space(reader, &val, s, &pinfo->cs)) {
         // PDF/raster: invalid color space in strip
         compliance(reader, READ_VALID_COLORSPACE, val);
+        return FALSE;
+    }
+    pinfo->format = infer_pixel_format(pinfo->cs, pinfo->BitsPerComponent);
+    if (pinfo->format == RASREAD_FORMAT_NULL) {
+        // oops.
+        compliance(reader, READ_STRIP_CS_BPC, pinfo->pos);
         return FALSE;
     }
 
@@ -1918,19 +1957,30 @@ static int get_page_info(t_pdfrasreader* reader, int p, t_pdfpageinfo* pinfo)
             // errors already logged
             return FALSE;
         }
-		// page height is sum of strip heights
-        pinfo->height += strip.height;
-		// get/check strip width
-		if (stripno == 0) {
-			pinfo->width = strip.width;
-		}
-		else if (pinfo->width != strip.width) {
-			// all strips on a page must have the same width
+        if (stripno == 0) {
+            pinfo->width = strip.width;
+            pinfo->format = strip.format;
+            pinfo->BitsPerComponent = strip.BitsPerComponent;
+        }
+        else if (pinfo->width != strip.width) {
+            // all strips on a page must have the same width
             compliance(reader, READ_STRIP_WIDTH_SAME, strip.pos);
             return FALSE;
         }
+        else if (pinfo->format != strip.format) {
+            // all strips on a page must have the same format
+            compliance(reader, READ_STRIP_FORMAT_SAME, strip.pos);
+            return FALSE;
+        }
+        else if (pinfo->BitsPerComponent != strip.BitsPerComponent) {
+            // all strips on a page must have the same bits/component
+            compliance(reader, READ_STRIP_FORMAT_SAME, strip.pos);
+            return FALSE;
+        }
+        // page height is sum of strip heights
+        pinfo->height += strip.height;
 		// max_strip_size is (surprise) the maximum of the strip sizes (in bytes)
-		pinfo->max_strip_size = ulmax(pinfo->max_strip_size, (unsigned long)strip.uncompressed_size);
+		pinfo->max_strip_size = ulmax(pinfo->max_strip_size, (unsigned long)strip.raw_size);
 		// found a valid strip, count it
 		pinfo->strip_count++;
 	} // for each strip
@@ -2032,6 +2082,15 @@ RasterPixelFormat pdfrasread_page_format(t_pdfrasreader* reader, int n)
     return info.format;
 }
 
+int pdfrasread_page_bits_per_component(t_pdfrasreader* reader, int n)
+{
+    t_pdfpageinfo info;
+    if (!get_page_info(reader, n, &info)) {
+        return RASREAD_FORMAT_NULL;
+    }
+    return info.BitsPerComponent;
+}
+
 // Return the pixel width of the raster image of page n
 int pdfrasread_page_width(t_pdfrasreader* reader, int n)
 {
@@ -2112,7 +2171,7 @@ size_t pdfrasread_read_raw_strip(t_pdfrasreader* reader, int p, int s, void* buf
         // error already reported.
         return 0;
     }
-    size_t length = strip.compressed_size;
+    size_t length = strip.raw_size;
     if (length > bufsize) {
         // invalid strip request, strip does not fit in buffer
         api_error(reader, READ_STRIP_BUFFER_SIZE, length);
@@ -2144,30 +2203,42 @@ static const char* error_code_description(int code)
     case READ_API_NULL_PARAM:       return "function called with null parameter that can't be null.";
     case READ_API_ALREADY_OPEN:     return "function called with a reader that was already open.";
     case READ_API_NOT_OPEN:         return "function called with a reader that isn't open.";
-    case READ_DICT_OBJSTM: return "dictionary with /Type /ObjStm  S6.2 P4";
-    case READ_DICT_EOF: return "end-of-file in dictionary. where is the '>>'?";
-    case READ_DICT_VALUE: return "malformed or missing value in dictionary";
-    case READ_STREAM_CRLF: return "stream keyword followed by CR but then no LF";
-    case READ_STREAM_LINEBREAK: return "stream keyword not followed by CRLF or LF";
-    case READ_STREAM_LENGTH: return "stream dictionary /Length entry not found";
-    case READ_STREAM_LENGTH_INT: return "stream - /Length value isn't an integer literal";
-    case READ_STREAM_ENDSTREAM: return "endstream not found where expected";
-    case READ_OBJECT_EOF: return "end-of-file where a PDF value or object was expected";
-    case READ_OBJECT: return "expected an object,no object starts with this character";
-    case READ_STRIP_TYPE_XOBJECT: return "strip /Type is not /XObject [PDF2 8.9.5]";
-    case READ_STRIP_SUBTYPE: return "strip lacks /Subtype or its value isn't /Image";
+    case READ_API_NO_SUCH_PAGE:     return "function called with page index that is out-of-range";
+    case READ_API_NO_SUCH_STRIP:    return "function called with strip index that is out-of-range";
+    case READ_STRIP_BUFFER_SIZE:    return "strip too big to fit in provided strip buffer.";
+    case READ_INTERNAL_XREF_SIZE:   return "internal build/compilation error: sizeof(xref_entry) != 20 bytes";
+    case READ_INTERNAL_XREF_TABLE:  return "internal error - xref table not loaded";
+    case READ_MEMORY_MALLOC:        return "malloc returned NULL - insufficient memory (or heap corrupt)";
+    case READ_FILE_EOF_MARKER:      return "%%EOF not found near end of file (prob. not a PDF)";
+    case READ_FILE_STARTXREF:       return "startxref not found near end of file (so prob. not a PDF)";
+    case READ_FILE_BAD_STARTXREF:   return "startxref found - but invalid syntax or value";
+    case READ_DICT_OBJSTM:          return "dictionary with /Type /ObjStm  S6.2 P4";
+    case READ_DICT_EOF:             return "end-of-file in dictionary. where is the '>>'?";
+    case READ_DICT_VALUE:           return "malformed or missing value in dictionary";
+    case READ_STREAM_CRLF:          return "stream keyword followed by CR but then no LF";
+    case READ_STREAM_LINEBREAK:     return "stream keyword not followed by CRLF or LF";
+    case READ_STREAM_LENGTH:        return "stream dictionary /Length entry not found";
+    case READ_STREAM_LENGTH_INT:    return "stream - /Length value isn't an integer literal";
+    case READ_STREAM_ENDSTREAM:     return "endstream not found where expected";
+    case READ_OBJECT_EOF:           return "end-of-file where a PDF value or object was expected";
+    case READ_OBJECT:               return "expected an object,no object starts with this character";
+    case READ_STRIP_TYPE_XOBJECT:   return "strip /Type is not /XObject [PDF2 8.9.5]";
+    case READ_STRIP_SUBTYPE:        return "strip lacks /Subtype or its value isn't /Image";
     case READ_STRIP_BITSPERCOMPONENT: return "strip must have /BitsPerComponent value of 1, 8 or 16";
-    case READ_STRIP_HEIGHT: return "strip must have /Height entry with inline non-negative integer value";
-    case READ_STRIP_WIDTH: return "strip must have /Width entry with inline non-negative integer value";
-    case READ_STRIP_WIDTH_SAME: return "all strips on a page must have equal /Width values";
-    case READ_STRIP_COLORSPACE: return "strip must have a /Colorspace entry";
-    case READ_STRIP_LENGTH: return "strip must have /Length with non-negative inline integer value";
-    case READ_VALID_COLORSPACE: return "colorspace must comply with spec";
-    case READ_CALGRAY_DICT: return "/CalGray not followed by valid CalGray dictionary";
-    case READ_CALRGB_DICT: return "/CalRGB not followed by valid CalRGB dictionary";
-    case READ_ICC_PROFILE: return "not a valid ICC Profile stream";
-    case READ_ICCPROFILE_READ: return "read error while reading ICC Profile data";
-    case READ_COLORSPACE_ARRAY: return "colorspace array syntax error - missing closing ']'?";
+    case READ_STRIP_CS_BPC:         return "invalid combination of /ColorSpace and /BitsPerComponent in strip";
+    case READ_STRIP_HEIGHT:         return "strip must have /Height entry with inline non-negative integer value";
+    case READ_STRIP_WIDTH:          return "strip must have /Width entry with inline non-negative integer value";
+    case READ_STRIP_WIDTH_SAME:     return "all strips on a page must have equal /Width values";
+    case READ_STRIP_FORMAT_SAME:    return "all strips on a page must have the same pixel format";
+    case READ_STRIP_DEPTH_SAME:     return "all strips on a page must have the same BitsPerComponent";
+    case READ_STRIP_COLORSPACE:     return "strip must have a /Colorspace entry";
+    case READ_STRIP_LENGTH:         return "strip must have /Length with non-negative inline integer value";
+    case READ_VALID_COLORSPACE:     return "colorspace must comply with spec";
+    case READ_CALGRAY_DICT:         return "/CalGray not followed by valid CalGray dictionary";
+    case READ_CALRGB_DICT:          return "/CalRGB not followed by valid CalRGB dictionary";
+    case READ_ICC_PROFILE:          return "not a valid ICC Profile stream";
+    case READ_ICCPROFILE_READ:      return "read error while reading ICC Profile data";
+    case READ_COLORSPACE_ARRAY:     return "colorspace array syntax error - missing closing ']'?";
     default:
         return "<no details>";
     }

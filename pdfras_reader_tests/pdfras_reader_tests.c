@@ -162,6 +162,7 @@ void page_info_tests()
 	ASSERT(7 == pdfrasread_page_count(reader));
 
 	ASSERT(RASREAD_BITONAL == pdfrasread_page_format(reader, 0));
+    ASSERT(1 == pdfrasread_page_bits_per_component(reader, 0));
 	ASSERT(850 == pdfrasread_page_width(reader, 0));
 	ASSERT(1100 == pdfrasread_page_height(reader, 0));
 	ASSERT(0 == pdfrasread_page_rotation(reader, 0));
@@ -169,37 +170,42 @@ void page_info_tests()
 	ASSERT(100.0 == pdfrasread_page_vertical_dpi(reader, 0));
 
 	ASSERT(RASREAD_BITONAL == pdfrasread_page_format(reader, 1));
-	ASSERT(2521 == pdfrasread_page_width(reader, 1));
+    ASSERT(1 == pdfrasread_page_bits_per_component(reader, 1));
+    ASSERT(2521 == pdfrasread_page_width(reader, 1));
 	ASSERT(3279 == pdfrasread_page_height(reader, 1));
 	ASSERT(0 == pdfrasread_page_rotation(reader, 1));
 	ASSERT(300.0 == pdfrasread_page_horizontal_dpi(reader, 1));
 	ASSERT(300.0 == pdfrasread_page_vertical_dpi(reader, 1));
-    ASSERT(33460 == pdfrasread_max_strip_size(reader, 1));
+    ASSERT(33450 == pdfrasread_max_strip_size(reader, 1));
 
 	ASSERT(RASREAD_GRAY8 == pdfrasread_page_format(reader, 2));
+    ASSERT(8 == pdfrasread_page_bits_per_component(reader, 2));
     ASSERT(8 == pdfrasread_page_width(reader, 2));
     ASSERT(11 == pdfrasread_page_height(reader, 2));
     ASSERT(0 == pdfrasread_page_rotation(reader, 2));
     ASSERT(2.0 == pdfrasread_page_horizontal_dpi(reader, 2));
     ASSERT(2.0 == pdfrasread_page_vertical_dpi(reader, 2));
-    ASSERT(98 == pdfrasread_max_strip_size(reader, 2));
+    ASSERT(88 == pdfrasread_max_strip_size(reader, 2));
 
 	ASSERT(RASREAD_GRAY8 == pdfrasread_page_format(reader, 3));
-	ASSERT(850 == pdfrasread_page_width(reader, 3));
+    ASSERT(8 == pdfrasread_page_bits_per_component(reader, 3));
+    ASSERT(850 == pdfrasread_page_width(reader, 3));
 	ASSERT(1100 == pdfrasread_page_height(reader, 3));
 	ASSERT(0 == pdfrasread_page_rotation(reader, 3));
 	ASSERT(100.0 == pdfrasread_page_horizontal_dpi(reader, 3));
 	ASSERT(100.0 == pdfrasread_page_vertical_dpi(reader, 3));
-    ASSERT(116979 == pdfrasread_max_strip_size(reader, 3));
+    ASSERT(116969 == pdfrasread_max_strip_size(reader, 3));
 
 	ASSERT(RASREAD_GRAY16 == pdfrasread_page_format(reader, 4));
-	ASSERT(64 == pdfrasread_page_width(reader, 4));
+    ASSERT(16 == pdfrasread_page_bits_per_component(reader, 4));
+    ASSERT(64 == pdfrasread_page_width(reader, 4));
 	ASSERT(512 == pdfrasread_page_height(reader, 4));
 	ASSERT(0 == pdfrasread_page_rotation(reader, 4));
 	ASSERT(16.0 == pdfrasread_page_horizontal_dpi(reader, 4));
 	ASSERT(128.0 == pdfrasread_page_vertical_dpi(reader, 4));
 
     ASSERT(RASREAD_RGB24 == pdfrasread_page_format(reader, 5));
+    ASSERT(8 == pdfrasread_page_bits_per_component(reader, 5));
     ASSERT(850 == pdfrasread_page_width(reader, 5));
     ASSERT(1100 == pdfrasread_page_height(reader, 5));
     ASSERT(180 == pdfrasread_page_rotation(reader, 5));
@@ -207,7 +213,8 @@ void page_info_tests()
     ASSERT(100.0 == pdfrasread_page_vertical_dpi(reader, 5));
 
 	ASSERT(RASREAD_RGB24 == pdfrasread_page_format(reader, 6));
-	ASSERT(175 == pdfrasread_page_width(reader, 6));
+    ASSERT(8 == pdfrasread_page_bits_per_component(reader, 6));
+    ASSERT(175 == pdfrasread_page_width(reader, 6));
 	ASSERT(100 == pdfrasread_page_height(reader, 6));
 	ASSERT(90== pdfrasread_page_rotation(reader, 6));
 	ASSERT(50.0 == pdfrasread_page_horizontal_dpi(reader, 6));
@@ -215,6 +222,10 @@ void page_info_tests()
 
     // page that doesn't exist:
     ASSERT(RASREAD_FORMAT_NULL == pdfrasread_page_format(reader, 7));
+    ASSERT(0 == pdfrasread_page_bits_per_component(reader, 7));
+    ASSERT(0 == pdfrasread_page_width(reader, 7));
+    ASSERT(0 == pdfrasread_page_height(reader, 7));
+    ASSERT(0 == pdfrasread_page_rotation(reader, 7));
     ASSERT(RASREAD_FORMAT_NULL == pdfrasread_page_format(reader, -1));
     ASSERT(RASREAD_FORMAT_NULL == pdfrasread_page_format(reader, 65535));
 
