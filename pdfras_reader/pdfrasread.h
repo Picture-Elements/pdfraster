@@ -89,6 +89,10 @@ const char* pdfrasread_lib_version(void);
 // See pdfrasread_set_error_handler to override error handling for individual readers.
 void pdfrasread_set_global_error_handler(pdfras_err_handler errhandler);
 
+// Return the current global error handler for this library.
+// Cannot fail and always returns a valid function pointer, never NULL.
+pdfras_err_handler pdfrasread_get_global_error_handler(void);
+
 // Attach an error-handler to a PDF/raster reader.
 // Note the first parameter is a t_pdfrasreader*, not a void* source like the readfn and closefn.
 //
@@ -268,7 +272,10 @@ typedef enum {
 	READ_STRIP_LENGTH,				// strip must have /Length with non-negative inline integer value
 	READ_VALID_COLORSPACE,		    // colorspace must comply with spec
     READ_CALGRAY_DICT,              // /CalGray not followed by valid CalGray dictionary
+    READ_CALGRAY_GAMMA,             // CalGray dict /Gamma not followed by number
     READ_CALRGB_DICT,               // /CalRGB not followed by valid CalRGB dictionary
+    READ_WHITEPOINT,                // expected a whitepoint array [ r g b ]
+    READ_BLACKPOINT,                // expected a blackpoint array [ r g b ]
     READ_ICC_PROFILE,               // not a valid ICC Profile stream
     READ_ICCPROFILE_READ,           // read error while reading ICC Profile data
     READ_COLORSPACE_ARRAY,          // colorspace array syntax error - missing closing ']'?

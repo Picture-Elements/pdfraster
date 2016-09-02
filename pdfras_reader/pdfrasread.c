@@ -12,7 +12,8 @@
 ///////////////////////////////////////////////////////////////////////
 // Internal Constants
 
-#define PDFRASREAD_VERSION "0.7.3.0"
+#define PDFRASREAD_VERSION "0.7.4.0"
+// 0.7.4.0  spike   2016.09.01  more colorspace parsing (/CalGray)
 // 0.7.3.0  spike   2016.08.23  created get_strip_info
 //                              more colorspace parsing
 // 0.7.2.0  spike   2016.08.21  many more error reports esp. compliance
@@ -1002,6 +1003,81 @@ static int parse_array(t_pdfrasreader* reader, pduint32 *poff)
 	return TRUE;
 }
 
+static int parse_colorpoint(t_pdfrasreader* reader, pduint32 *poff, double point[3])
+{
+    skip_whitespace(reader, poff);
+    if (peekch(reader, *poff) != '[') {
+        // not a valid array
+        return FALSE;
+    }
+    // step over the opening '['
+    nextch(reader, poff);
+    int nvalues = 0;
+    while (!token_eat(reader, poff, "]")) {
+        if (nvalues == 3 || !token_number(reader, poff, &point[nvalues])) {
+            // not a number
+            return FALSE;
+        }
+        nvalues++;
+    }
+    if (nvalues != 3) {
+        return FALSE;
+    }
+    return TRUE;
+}
+
+// parse & validate a /CalGray dictionary starting at *poff.
+// If (and only if) successful, update *poff to point to the token after the dictionary.
+static int parse_calgray_dictionary(t_pdfrasreader* reader, pduint32 *poff)
+{
+    // TODO: check for missing or duplicate keys!
+    pduint32 off = *poff;
+    if (!token_eat(reader, &off, "<<")) {
+        // not a dictionary - or is mangled
+        return FALSE;
+    }
+    while (!token_eat(reader, &off, ">>")) {
+        // each entry consist of a key (a /name) followed by a value.
+        if ('/' != peekch(reader, off)) {
+            // invalid PDF: dictionary key is not a Name
+            compliance(reader, READ_DICT_NAME_KEY, off);
+            return FALSE;
+        }
+        if (token_eat(reader, &off, "/Gamma")) {
+            // parse & check gamma value
+            double dGamma;
+            if (!token_number(reader, &off, &dGamma) || dGamma < 0.1 || dGamma > 3.0) {
+                compliance(reader, READ_CALGRAY_GAMMA, off);
+                return FALSE;
+            }
+        }
+        else if (token_eat(reader, &off, "/WhitePoint")) {
+            // parse & check [ r g b ]
+            double whitepoint[3];
+            if (!token_match(reader, off, "[") ||
+                !parse_colorpoint(reader, &off, whitepoint)) {
+                compliance(reader, READ_WHITEPOINT, off);
+                return FALSE;
+            }
+        }
+        else if (token_eat(reader, &off, "/BlackPoint")) {
+            // parse & check [ r g b ]
+            double blackpoint[3];
+            if (!token_match(reader, off, "[") ||
+                !parse_colorpoint(reader, &off, blackpoint)) {
+                compliance(reader, READ_BLACKPOINT, off);
+                return FALSE;
+            }
+        }
+        else {
+            compliance(reader, READ_CALGRAY_DICT, off);
+            return FALSE;
+        }
+    }
+    *poff = off;
+    return TRUE;
+}
+
 static int parse_icc_profile(t_pdfrasreader* reader, pduint32 *poff, ICCProfile** ppiccProfile)
 {
     pduint32 off = *poff;
@@ -1039,11 +1115,14 @@ static int parse_color_space(t_pdfrasreader* reader, pduint32 *poff, int bitsPer
 	else if (token_eat(reader, poff, "[")) {
 		if (token_eat(reader, poff, "/CalGray")) {
             pcs->style = CS_CALGRAY;
-            pduint32 dict = *poff;
-            parse_indirect_reference(reader, poff, &dict);
-            // this isn't right if dict is in-line: needs to advance *poff
-            if (!parse_dictionary(reader, &dict)) {
+            pduint32 dict;
+            if (parse_indirect_reference(reader, poff, &dict) &&
+                !parse_calgray_dictionary(reader, &dict)) {
                 compliance(reader, READ_CALGRAY_DICT, dict);
+                return FALSE;
+            }
+            else if (!parse_calgray_dictionary(reader, poff)) {
+                compliance(reader, READ_CALGRAY_DICT, *poff);
                 return FALSE;
             }
         }
@@ -2056,6 +2135,43 @@ RasterCompression pdfrasread_strip_compression(t_pdfrasreader* reader, int p, in
     return strip.compression;
 }
 
+static const char* error_code_description(int code)
+{
+    switch (code) {
+    case READ_OK:                   return "OK";
+    case READ_API_BAD_READER:       return "an API function was called with an invalid reader";
+    case READ_API_APILEVEL:         return "pdfrasread_create called with apiLevel < 1 or > what library supports.";
+    case READ_API_NULL_PARAM:       return "function called with null parameter that can't be null.";
+    case READ_API_ALREADY_OPEN:     return "function called with a reader that was already open.";
+    case READ_API_NOT_OPEN:         return "function called with a reader that isn't open.";
+    case READ_DICT_OBJSTM: return "dictionary with /Type /ObjStm  S6.2 P4";
+    case READ_DICT_EOF: return "end-of-file in dictionary. where is the '>>'?";
+    case READ_DICT_VALUE: return "malformed or missing value in dictionary";
+    case READ_STREAM_CRLF: return "stream keyword followed by CR but then no LF";
+    case READ_STREAM_LINEBREAK: return "stream keyword not followed by CRLF or LF";
+    case READ_STREAM_LENGTH: return "stream dictionary /Length entry not found";
+    case READ_STREAM_LENGTH_INT: return "stream - /Length value isn't an integer literal";
+    case READ_STREAM_ENDSTREAM: return "endstream not found where expected";
+    case READ_OBJECT_EOF: return "end-of-file where a PDF value or object was expected";
+    case READ_OBJECT: return "expected an object,no object starts with this character";
+    case READ_STRIP_TYPE_XOBJECT: return "strip /Type is not /XObject [PDF2 8.9.5]";
+    case READ_STRIP_SUBTYPE: return "strip lacks /Subtype or its value isn't /Image";
+    case READ_STRIP_BITSPERCOMPONENT: return "strip must have /BitsPerComponent value of 1, 8 or 16";
+    case READ_STRIP_HEIGHT: return "strip must have /Height entry with inline non-negative integer value";
+    case READ_STRIP_WIDTH: return "strip must have /Width entry with inline non-negative integer value";
+    case READ_STRIP_WIDTH_SAME: return "all strips on a page must have equal /Width values";
+    case READ_STRIP_COLORSPACE: return "strip must have a /Colorspace entry";
+    case READ_STRIP_LENGTH: return "strip must have /Length with non-negative inline integer value";
+    case READ_VALID_COLORSPACE: return "colorspace must comply with spec";
+    case READ_CALGRAY_DICT: return "/CalGray not followed by valid CalGray dictionary";
+    case READ_CALRGB_DICT: return "/CalRGB not followed by valid CalRGB dictionary";
+    case READ_ICC_PROFILE: return "not a valid ICC Profile stream";
+    case READ_ICCPROFILE_READ: return "read error while reading ICC Profile data";
+    case READ_COLORSPACE_ARRAY: return "colorspace array syntax error - missing closing ']'?";
+    default:
+        return "<no details>";
+    }
+}
 
 int pdfrasread_default_error_handler(t_pdfrasreader* reader, int level, int code, pduint32 offset)
 {
@@ -2080,7 +2196,7 @@ int pdfrasread_default_error_handler(t_pdfrasreader* reader, int level, int code
     assert(level >= REPORTING_INFO);
     assert(level <= REPORTING_OTHER);
     level = MAX(REPORTING_INFO, MIN(REPORTING_OTHER, level));
-    fprintf(stderr, "%c %13s  offset +%06u, code %d\n", marker, levelName[level], offset, code);
+    fprintf(stderr, "%c %13s  offset +%06u, code %d: %s\n", marker, levelName[level], offset, code, error_code_description(code));
     return 0;
 }
 
@@ -2103,6 +2219,11 @@ void pdfrasread_set_global_error_handler(pdfras_err_handler errhandler)
         errhandler = pdfrasread_default_error_handler;
     }
     global_error_handler = errhandler;
+}
+
+pdfras_err_handler pdfrasread_get_global_error_handler(void)
+{
+    return global_error_handler;
 }
 
 
