@@ -69,6 +69,7 @@ typedef struct _ICCProfile ICCProfile;
 
 typedef struct t_colorspace {
     enum { CS_CALGRAY, CS_DEVICEGRAY, CS_CALRGB, CS_DEVICERGB, CS_ICCBASED } style;
+    unsigned long		bitsPerComponent;
     double				whitePoint[3];
     double				blackPoint[3];
     double              gamma;              // all: Gamma exponent
@@ -79,7 +80,6 @@ typedef struct t_colorspace {
 // All the information about a single page and the image it contains
 typedef struct {
 	pduint32			off;				// offset of page object in file
-	unsigned long		BitsPerComponent;
 	double				MediaBox[4];
 	RasterPixelFormat	format;
     t_colorspace        cs;                 // colorspace descriptor
@@ -101,7 +101,6 @@ typedef struct {
     RasterCompression   compression;        // image compression
     RasterPixelFormat   format;
     t_colorspace        cs;                 // colorspace
-    unsigned long       BitsPerComponent;
     unsigned long       width;
     unsigned long       height;             // of this strip
 } t_pdfstripinfo;
@@ -174,6 +173,9 @@ int colorspace_equal(t_colorspace c, t_colorspace d)
 {
     int i;
     if (c.style != d.style) {
+        return FALSE;
+    }
+    if (c.bitsPerComponent != d.bitsPerComponent) {
         return FALSE;
     }
     if (fabs(c.gamma - d.gamma) > 0.00001) {
@@ -1085,7 +1087,7 @@ static int parse_calrgb_matrix(t_pdfrasreader* reader, pduint32 *poff, double ma
 
 // parse & validate a /CalGray dictionary starting at *poff.
 // If (and only if) successful, update *poff to point to the token after the dictionary.
-static int parse_calgray_dictionary(t_pdfrasreader* reader, int bitsPerComponent, t_colorspace* pcs, pduint32 *poff)
+static int parse_calgray_dictionary(t_pdfrasreader* reader, t_colorspace* pcs, pduint32 *poff)
 {
     // TODO: check for missing or duplicate keys!
     pduint32 off = *poff;
@@ -1142,7 +1144,7 @@ static int parse_calgray_dictionary(t_pdfrasreader* reader, int bitsPerComponent
 
 // parse & validate a /CalRGB dictionary starting at *poff.
 // If (and only if) successful, update *poff to point to the token after the dictionary.
-static int parse_calrgb_dictionary(t_pdfrasreader* reader, int bitsPerComponent, t_colorspace* pcs, pduint32 *poff)
+static int parse_calrgb_dictionary(t_pdfrasreader* reader, t_colorspace* pcs, pduint32 *poff)
 {
     // TODO: check for missing or duplicate keys!
     pduint32 off = *poff;
@@ -1225,7 +1227,7 @@ static int parse_icc_profile(t_pdfrasreader* reader, pduint32 *poff, ICCProfile*
     return TRUE;
 }
 
-static int parse_color_space(t_pdfrasreader* reader, pduint32 *poff, int bitsPerComponent, t_colorspace* pcs)
+static int parse_color_space(t_pdfrasreader* reader, pduint32 *poff, t_colorspace* pcs)
 {
 	// TODO: If stripno == 0, colorspace info should be undefined, ...
 	// If stripno != 0, colorspace info must match what's already set in info
@@ -1240,12 +1242,12 @@ static int parse_color_space(t_pdfrasreader* reader, pduint32 *poff, int bitsPer
             pcs->style = CS_CALGRAY;
             pduint32 dict = *poff;
             if (parse_indirect_reference(reader, poff, &dict)) {
-                if (!parse_calgray_dictionary(reader, bitsPerComponent, pcs, &dict)) {
+                if (!parse_calgray_dictionary(reader, pcs, &dict)) {
                     compliance(reader, READ_CALGRAY_DICT, dict);
                     return FALSE;
                 }
             }
-            else if (!parse_calgray_dictionary(reader, bitsPerComponent, pcs, poff)) {
+            else if (!parse_calgray_dictionary(reader, pcs, poff)) {
                 compliance(reader, READ_CALGRAY_DICT, *poff);
                 return FALSE;
             }
@@ -1254,12 +1256,12 @@ static int parse_color_space(t_pdfrasreader* reader, pduint32 *poff, int bitsPer
             pcs->style = CS_CALRGB;
             pduint32 dict = *poff;
             if (parse_indirect_reference(reader, poff, &dict)) {
-                if (!parse_calrgb_dictionary(reader, bitsPerComponent, pcs, &dict)) {
+                if (!parse_calrgb_dictionary(reader, pcs, &dict)) {
                     compliance(reader, READ_CALRGB_DICT, dict);
                     return FALSE;
                 }
             }
-            else if (!parse_calrgb_dictionary(reader, bitsPerComponent, pcs, poff)) {
+            else if (!parse_calrgb_dictionary(reader, pcs, poff)) {
                 compliance(reader, READ_CALRGB_DICT, dict);
                 return FALSE;
             }
@@ -1854,10 +1856,11 @@ static int find_strip(t_pdfrasreader* reader, int p, int s, pduint32* pstrip)
 
 // Given a colorspace and a bit depth (per component), infer and return the "pixel format".
 // Returns RASREAD_FORMAT_NULL on error - up to caller to report the problem.
-static RasterPixelFormat infer_pixel_format(t_colorspace cs, int depth)
+static RasterPixelFormat infer_pixel_format(t_colorspace cs)
 {
     RasterPixelFormat format = RASREAD_FORMAT_NULL;
     //CS_CALGRAY, CS_DEVICEGRAY, CS_CALRGB, CS_DEVICERGB, CS_ICCBASED
+    int depth = cs.bitsPerComponent;
     switch (cs.style) {
     case CS_CALGRAY:
     case CS_DEVICEGRAY:
@@ -1936,8 +1939,8 @@ static int get_strip_info(t_pdfrasreader* reader, int p, int s, t_pdfstripinfo* 
     }
     // /BitsPerComponent is required (for our kind of images) and must be 1,8 or 16
     if (!dictionary_lookup(reader, pinfo->pos, "/BitsPerComponent", &val) ||
-        !token_ulong(reader, &val, &pinfo->BitsPerComponent) ||
-        (pinfo->BitsPerComponent != 1 && pinfo->BitsPerComponent != 8 && pinfo->BitsPerComponent != 16)) {
+        !token_ulong(reader, &val, &pinfo->cs.bitsPerComponent) ||
+        (pinfo->cs.bitsPerComponent != 1 && pinfo->cs.bitsPerComponent != 8 && pinfo->cs.bitsPerComponent != 16)) {
         // strip doesn't have valid BitsPerComponent?
         compliance(reader, READ_STRIP_BITSPERCOMPONENT, pinfo->pos);
         return FALSE;
@@ -1960,12 +1963,12 @@ static int get_strip_info(t_pdfrasreader* reader, int p, int s, t_pdfstripinfo* 
         return FALSE;
     }
     // That's all the mandatory entries!
-    if (!parse_color_space(reader, &val, pinfo->BitsPerComponent, &pinfo->cs)) {
+    if (!parse_color_space(reader, &val, &pinfo->cs)) {
         // PDF/raster: invalid color space in strip
         compliance(reader, READ_VALID_COLORSPACE, val);
         return FALSE;
     }
-    pinfo->format = infer_pixel_format(pinfo->cs, pinfo->BitsPerComponent);
+    pinfo->format = infer_pixel_format(pinfo->cs);
     if (pinfo->format == RASREAD_FORMAT_NULL) {
         // oops.
         compliance(reader, READ_STRIP_CS_BPC, pinfo->pos);
@@ -2093,7 +2096,7 @@ static int get_page_info(t_pdfrasreader* reader, int p, t_pdfpageinfo* pinfo)
             pinfo->width = strip.width;
             pinfo->format = strip.format;
             pinfo->cs = strip.cs;
-            pinfo->BitsPerComponent = strip.BitsPerComponent;
+            pinfo->cs.bitsPerComponent = strip.cs.bitsPerComponent;
         }
         else if (pinfo->width != strip.width) {
             // all strips on a page must have the same width
@@ -2105,11 +2108,6 @@ static int get_page_info(t_pdfrasreader* reader, int p, t_pdfpageinfo* pinfo)
             compliance(reader, READ_STRIP_FORMAT_SAME, strip.pos);
             return FALSE;
         }
-        else if (pinfo->BitsPerComponent != strip.BitsPerComponent) {
-            // all strips on a page must have the same bits/component
-            compliance(reader, READ_STRIP_FORMAT_SAME, strip.pos);
-            return FALSE;
-        } 
         else if (!colorspace_equal(pinfo->cs, strip.cs)) {
             // all strips on a page must have equal colorspaces
             compliance(reader, READ_STRIP_COLORSPACE_SAME, strip.pos);
@@ -2226,7 +2224,7 @@ int pdfrasread_page_bits_per_component(t_pdfrasreader* reader, int n)
     if (!get_page_info(reader, n, &info)) {
         return RASREAD_FORMAT_NULL;
     }
-    return info.BitsPerComponent;
+    return info.cs.bitsPerComponent;
 }
 
 // Return the pixel width of the raster image of page n
