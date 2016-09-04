@@ -12,7 +12,9 @@
 ///////////////////////////////////////////////////////////////////////
 // Internal Constants
 
-#define PDFRASREAD_VERSION "0.7.5.0"
+#define PDFRASREAD_VERSION "0.7.6.0"
+// 0.7.6.0  spike   2016.09.03  /CalRGB parsing, fixed /ICCBased parse
+//                              fix! trailer parse failed if NUL in last KByte.
 // 0.7.5.0  spike   2016.09.02  pixel format and bits_per_component working (again)
 // 0.7.4.0  spike   2016.09.01  more colorspace parsing (/CalGray)
 // 0.7.3.0  spike   2016.08.23  created get_strip_info
@@ -69,8 +71,9 @@ typedef struct t_colorspace {
     enum { CS_CALGRAY, CS_DEVICEGRAY, CS_CALRGB, CS_DEVICERGB, CS_ICCBASED } style;
     double				whitePoint[3];
     double				blackPoint[3];
-    double              gamma;
-    ICCProfile*         piccProfile;
+    double              gamma;              // all: Gamma exponent
+    double              matrix[9];          // CalRGB: 3x3 matrix
+    ICCProfile*         piccProfile;        // ICCBased: pointer to ICC profile
 } t_colorspace;
 
 // All the information about a single page and the image it contains
@@ -141,12 +144,19 @@ static pdfras_err_handler global_error_handler = pdfrasread_default_error_handle
 
 #define VALID(p) ((p)!=NULL && (p)->sig==READER_SIGNATURE)
 
-// Find last occurrence of string in string
-static const char * strrstr(const char * haystack, const char * needle)
+// Find last occurrence of string in data between start and end pointers, and
+// return a pointer to it.  If not found, return NULL.
+static const char * memrstr(const char* start, const char* end, const char * needle)
 {
-	const char *temp = haystack, *before = NULL;
-	while ((temp = strstr(temp, needle))) before = temp++;
-	return before;
+    size_t ncmp = strlen(needle);
+    end -= ncmp;
+    while (end >= start) {
+        if (memcmp(end, needle, ncmp) == 0) {
+            return end;
+        }
+        --end;
+    }
+    return NULL;
 }
 
 static unsigned long ulmax(unsigned long a, unsigned long b)
@@ -156,6 +166,30 @@ static unsigned long ulmax(unsigned long a, unsigned long b)
 
 // Utility functions, do not require a reader object
 //
+
+// colorspace equality - stricter than equivalence, we expect
+// all numbers to be exactly equal, and ICC profiles
+// if referenced must be EQ i.e. be the same object.
+int colorspace_equal(t_colorspace c, t_colorspace d)
+{
+    int i;
+    if (c.style != d.style) {
+        return FALSE;
+    }
+    if (fabs(c.gamma - d.gamma) > 0.00001) {
+        return FALSE;
+    }
+    for (i = 0; i < 3; i++) {
+        if (fabs(c.blackPoint[i] - d.blackPoint[i]) > 0.00001 ||
+            fabs(c.whitePoint[i] - d.whitePoint[i]) > 0.00001) {
+            return FALSE;
+        }
+    }
+    if (c.piccProfile != d.piccProfile) {
+        return FALSE;
+    }
+    return TRUE;
+}
 
 int pdfras_parse_pdfr_tag(const char* tag, int* pmajor, int* pminor)
 {
@@ -339,11 +373,11 @@ int pdfrasread_recognize_source(t_pdfrasreader* reader, void* source, int* pmajo
         // not PDF
         return FALSE;
     }
-    if (!strrstr(tail, "%%EOF")) {
+    if (!memrstr(tail, tail+tailsize, "%%EOF")) {
         // probably not a PDF
         return FALSE;
     }
-    const char* tag = strrstr(tail, "%PDF-raster-");
+    const char* tag = memrstr(tail, tail+tailsize, "%PDF-raster-");
     if (!tag || tag == tail) {
         return FALSE;
     }
@@ -1026,9 +1060,32 @@ static int parse_colorpoint(t_pdfrasreader* reader, pduint32 *poff, double point
     return TRUE;
 }
 
+static int parse_calrgb_matrix(t_pdfrasreader* reader, pduint32 *poff, double matrix[9])
+{
+    skip_whitespace(reader, poff);
+    if (peekch(reader, *poff) != '[') {
+        return FALSE;                   // not a valid array
+    }
+    // step over the opening '['
+    nextch(reader, poff);
+    int nvalues = 0;
+    while (!token_eat(reader, poff, "]")) {
+        if (nvalues == 9) {
+            return FALSE;               // array is too long
+        }if (!token_number(reader, poff, &matrix[nvalues])) {
+            return FALSE;               // element is not a number
+        }
+        nvalues++;
+    }
+    if (nvalues != 9) {
+        return FALSE;                   // array is too short
+    }
+    return TRUE;
+}
+
 // parse & validate a /CalGray dictionary starting at *poff.
 // If (and only if) successful, update *poff to point to the token after the dictionary.
-static int parse_calgray_dictionary(t_pdfrasreader* reader, pduint32 *poff)
+static int parse_calgray_dictionary(t_pdfrasreader* reader, int bitsPerComponent, t_colorspace* pcs, pduint32 *poff)
 {
     // TODO: check for missing or duplicate keys!
     pduint32 off = *poff;
@@ -1046,31 +1103,96 @@ static int parse_calgray_dictionary(t_pdfrasreader* reader, pduint32 *poff)
         if (token_eat(reader, &off, "/Gamma")) {
             // parse & check gamma value
             double dGamma;
-            if (!token_number(reader, &off, &dGamma) || dGamma < 0.1 || dGamma > 3.0) {
-                compliance(reader, READ_CALGRAY_GAMMA, off);
+            pduint32 valpos = off;
+            if (!token_number(reader, &off, &dGamma)) {
+                compliance(reader, READ_GAMMA_NUMBER, valpos);
                 return FALSE;
             }
+            if (fabs(dGamma - 2.2) > 0.0000001) {
+                // interestingly non-fatal compliance error:
+                // /Gamma must be 2.2 in bitonal and grayscale strips
+                compliance(reader, READ_GAMMA_22, valpos);
+            }
+            pcs->gamma = 2.2;
         }
         else if (token_eat(reader, &off, "/WhitePoint")) {
             // parse & check [ r g b ]
-            double whitepoint[3];
             if (!token_match(reader, off, "[") ||
-                !parse_colorpoint(reader, &off, whitepoint)) {
+                !parse_colorpoint(reader, &off, pcs->whitePoint)) {
                 compliance(reader, READ_WHITEPOINT, off);
                 return FALSE;
             }
         }
         else if (token_eat(reader, &off, "/BlackPoint")) {
             // parse & check [ r g b ]
-            double blackpoint[3];
             if (!token_match(reader, off, "[") ||
-                !parse_colorpoint(reader, &off, blackpoint)) {
+                !parse_colorpoint(reader, &off, pcs->blackPoint)) {
                 compliance(reader, READ_BLACKPOINT, off);
                 return FALSE;
             }
         }
         else {
             compliance(reader, READ_CALGRAY_DICT, off);
+            return FALSE;
+        }
+    }
+    *poff = off;
+    return TRUE;
+}
+
+// parse & validate a /CalRGB dictionary starting at *poff.
+// If (and only if) successful, update *poff to point to the token after the dictionary.
+static int parse_calrgb_dictionary(t_pdfrasreader* reader, int bitsPerComponent, t_colorspace* pcs, pduint32 *poff)
+{
+    // TODO: check for missing or duplicate keys!
+    pduint32 off = *poff;
+    if (!token_eat(reader, &off, "<<")) {
+        // not a dictionary - or is mangled
+        return FALSE;
+    }
+    while (!token_eat(reader, &off, ">>")) {
+        // each entry consist of a key (a /name) followed by a value.
+        if ('/' != peekch(reader, off)) {
+            // invalid PDF: dictionary key is not a Name
+            compliance(reader, READ_DICT_NAME_KEY, off);
+            return FALSE;
+        }
+        if (token_eat(reader, &off, "/Gamma")) {
+            // Optional for us (as in PDF)
+            double dGamma;
+            pduint32 valpos = off;
+            if (!token_number(reader, &off, &dGamma)) {
+                compliance(reader, READ_GAMMA_NUMBER, valpos);
+                return FALSE;
+            }
+            pcs->gamma = dGamma;
+        }
+        else if (token_eat(reader, &off, "/WhitePoint")) {
+            // Required. Value [ X Y Z ]  X and Z must be positive. Y must be 1.
+            if (!token_match(reader, off, "[") ||
+                !parse_colorpoint(reader, &off, pcs->whitePoint)) {
+                compliance(reader, READ_WHITEPOINT, off);
+                return FALSE;
+            }
+        }
+        else if (token_eat(reader, &off, "/BlackPoint")) {
+            // Optional. Value [ X Y Z ]  X and Z must be positive. Y must be 1.
+            if (!token_match(reader, off, "[") ||
+                !parse_colorpoint(reader, &off, pcs->blackPoint)) {
+                compliance(reader, READ_BLACKPOINT, off);
+                return FALSE;
+            }
+        }
+        else if (token_eat(reader, &off, "/Matrix")) {
+            // Optional.  Array of 9 numbers
+            if (!token_match(reader, off, "[") ||
+                !parse_calrgb_matrix(reader, &off, pcs->matrix)) {
+                compliance(reader, READ_CALRGB_MATRIX, off);
+                return FALSE;
+            }
+        }
+        else {
+            compliance(reader, READ_CALRGB_DICT, off);
             return FALSE;
         }
     }
@@ -1092,6 +1214,7 @@ static int parse_icc_profile(t_pdfrasreader* reader, pduint32 *poff, ICCProfile*
         memory_error(reader, __LINE__);
         return FALSE;
     }
+    // TODO: handle compression of Profile!
     if (reader->fread(reader->source, datapos, datalen, (char*)*ppiccProfile) != datalen) {
         io_error(reader, READ_ICCPROFILE_READ, __LINE__);
         free(*ppiccProfile); *ppiccProfile = NULL;
@@ -1115,13 +1238,14 @@ static int parse_color_space(t_pdfrasreader* reader, pduint32 *poff, int bitsPer
 	else if (token_eat(reader, poff, "[")) {
 		if (token_eat(reader, poff, "/CalGray")) {
             pcs->style = CS_CALGRAY;
-            pduint32 dict;
-            if (parse_indirect_reference(reader, poff, &dict) &&
-                !parse_calgray_dictionary(reader, &dict)) {
-                compliance(reader, READ_CALGRAY_DICT, dict);
-                return FALSE;
+            pduint32 dict = *poff;
+            if (parse_indirect_reference(reader, poff, &dict)) {
+                if (!parse_calgray_dictionary(reader, bitsPerComponent, pcs, &dict)) {
+                    compliance(reader, READ_CALGRAY_DICT, dict);
+                    return FALSE;
+                }
             }
-            else if (!parse_calgray_dictionary(reader, poff)) {
+            else if (!parse_calgray_dictionary(reader, bitsPerComponent, pcs, poff)) {
                 compliance(reader, READ_CALGRAY_DICT, *poff);
                 return FALSE;
             }
@@ -1129,21 +1253,29 @@ static int parse_color_space(t_pdfrasreader* reader, pduint32 *poff, int bitsPer
         else if (token_eat(reader, poff, "/CalRGB")) {
             pcs->style = CS_CALRGB;
             pduint32 dict = *poff;
-            parse_indirect_reference(reader, poff, &dict);
-            // this isn't right if dict is in-line: needs to advance *poff
-            if (!parse_dictionary(reader, &dict)) {
+            if (parse_indirect_reference(reader, poff, &dict)) {
+                if (!parse_calrgb_dictionary(reader, bitsPerComponent, pcs, &dict)) {
+                    compliance(reader, READ_CALRGB_DICT, dict);
+                    return FALSE;
+                }
+            }
+            else if (!parse_calrgb_dictionary(reader, bitsPerComponent, pcs, poff)) {
                 compliance(reader, READ_CALRGB_DICT, dict);
                 return FALSE;
             }
         }
         else if (token_eat(reader, poff, "/ICCBased")) {
             pcs->style = CS_ICCBASED;
-            pduint32 prof = *poff;
+            pduint32 dict = *poff;
             // could be an indirect reference
-            parse_indirect_reference(reader, poff, &prof);
-            // this isn't right if dict is in-line: needs to advance *poff
-            if (!parse_icc_profile(reader, &prof, &pcs->piccProfile)) {
-                compliance(reader, READ_ICC_PROFILE, prof);
+            if (parse_indirect_reference(reader, poff, &dict)) {
+                if (!parse_icc_profile(reader, &dict, &pcs->piccProfile)) {
+                    compliance(reader, READ_ICC_PROFILE, dict);
+                    return FALSE;
+                }
+            }
+            else if (!parse_icc_profile(reader, poff, &pcs->piccProfile)) {
+                compliance(reader, READ_ICC_PROFILE, dict);
                 return FALSE;
             }
         }
@@ -1551,7 +1683,7 @@ static int parse_trailer(t_pdfrasreader* reader)
 	char tail[1024+1];
 	size_t tailsize = pdfras_read_tail(reader, tail, sizeof tail - 1);
     pduint32 off = reader->filesize - tailsize;
-    const char* eof = strrstr(tail, "%%EOF");
+    const char* eof = memrstr(tail, tail+tailsize, "%%EOF");
     if (!eof) {
         // invalid PDF - %%EOF not found in tail of file.
         compliance(reader, READ_FILE_EOF_MARKER, off);
@@ -1559,14 +1691,14 @@ static int parse_trailer(t_pdfrasreader* reader)
     }
     // we need to find the startxref anyway, let's check now,
     // it's a good check for a valid PDF.
-    const char* startxref = strrstr(tail, "startxref");
+    const char* startxref = memrstr(tail, tail+tailsize, "startxref");
     if (!startxref) {
         // invalid PDF - startxref not found in tail of file.
         compliance(reader, READ_FILE_STARTXREF, off);
         return FALSE;
     }
     // find the PDF/raster 'tag'
-    const char* tag = strrstr(tail, "%PDF-raster-");
+    const char* tag = memrstr(tail, tail+tailsize, "%PDF-raster-");
     if (!tag || tag == tail) {
         // PDF/raster marker not found in tail of file
         compliance(reader, READ_FILE_PDFRASTER_TAG, off);
@@ -1828,7 +1960,7 @@ static int get_strip_info(t_pdfrasreader* reader, int p, int s, t_pdfstripinfo* 
         return FALSE;
     }
     // That's all the mandatory entries!
-    if (!parse_color_space(reader, &val, s, &pinfo->cs)) {
+    if (!parse_color_space(reader, &val, pinfo->BitsPerComponent, &pinfo->cs)) {
         // PDF/raster: invalid color space in strip
         compliance(reader, READ_VALID_COLORSPACE, val);
         return FALSE;
@@ -1960,6 +2092,7 @@ static int get_page_info(t_pdfrasreader* reader, int p, t_pdfpageinfo* pinfo)
         if (stripno == 0) {
             pinfo->width = strip.width;
             pinfo->format = strip.format;
+            pinfo->cs = strip.cs;
             pinfo->BitsPerComponent = strip.BitsPerComponent;
         }
         else if (pinfo->width != strip.width) {
@@ -1975,6 +2108,11 @@ static int get_page_info(t_pdfrasreader* reader, int p, t_pdfpageinfo* pinfo)
         else if (pinfo->BitsPerComponent != strip.BitsPerComponent) {
             // all strips on a page must have the same bits/component
             compliance(reader, READ_STRIP_FORMAT_SAME, strip.pos);
+            return FALSE;
+        } 
+        else if (!colorspace_equal(pinfo->cs, strip.cs)) {
+            // all strips on a page must have equal colorspaces
+            compliance(reader, READ_STRIP_COLORSPACE_SAME, strip.pos);
             return FALSE;
         }
         // page height is sum of strip heights
@@ -2230,6 +2368,7 @@ static const char* error_code_description(int code)
     case READ_STRIP_WIDTH:          return "strip must have /Width entry with inline non-negative integer value";
     case READ_STRIP_WIDTH_SAME:     return "all strips on a page must have equal /Width values";
     case READ_STRIP_FORMAT_SAME:    return "all strips on a page must have the same pixel format";
+    case READ_STRIP_COLORSPACE_SAME: return "all strips on a page must have equivalent colorspaces";
     case READ_STRIP_DEPTH_SAME:     return "all strips on a page must have the same BitsPerComponent";
     case READ_STRIP_COLORSPACE:     return "strip must have a /Colorspace entry";
     case READ_STRIP_LENGTH:         return "strip must have /Length with non-negative inline integer value";

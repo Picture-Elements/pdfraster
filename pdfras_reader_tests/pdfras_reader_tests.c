@@ -281,6 +281,14 @@ static int error_test_handler(t_pdfrasreader* reader, int level, int code, pduin
     return pdfrasread_default_error_handler(reader, level, code, offset);
 }
 
+static int error_handler_bad_gamma(t_pdfrasreader* reader, int level, int code, pduint32 offset)
+{
+    ASSERT(code == READ_GAMMA_22);
+    ASSERT(errmask == 0);               // should just be called once
+    errmask |= 0x1;
+    return 0;
+}
+
 void error_tests()
 {
     printf("-- error reporting tests --\n");
@@ -290,6 +298,18 @@ void error_tests()
     t_pdfrasreader* reader = pdfrasread_open_filename(RASREAD_API_LEVEL, "arrayjunk.pdf");
     ASSERT(reader == NULL);
     ASSERT(errmask == 0x3);
+
+    errmask = 0;
+    pdfrasread_set_global_error_handler(error_handler_bad_gamma);
+    reader = pdfrasread_open_filename(RASREAD_API_LEVEL, "bitonal badgamma.pdf");
+    ASSERT(reader);
+    if (reader) {
+        RasterPixelFormat format = pdfrasread_page_format(reader, 0);
+        ASSERT(format == RASREAD_BITONAL);
+        pdfrasread_destroy(reader);
+    }
+    ASSERT(errmask == 0x1);
+
     // restore the default global error handler
     pdfrasread_set_global_error_handler(NULL);
     printf("done\n");

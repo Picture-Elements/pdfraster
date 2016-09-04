@@ -276,15 +276,18 @@ typedef enum {
 	READ_STRIP_WIDTH,				// strip must have /Width entry with inline non-negative integer value
     READ_STRIP_WIDTH_SAME,          // all strips on a page must have equal /Width values
     READ_STRIP_FORMAT_SAME,         // all strips on a page must have the same pixel format
+    READ_STRIP_COLORSPACE_SAME,     // all strips on a page must have equivalent colorspaces
     READ_STRIP_DEPTH_SAME,          // all strips on a page must have the same pixel format
     READ_STRIP_COLORSPACE,			// strip must have a /Colorspace entry
 	READ_STRIP_LENGTH,				// strip must have /Length with non-negative inline integer value
 	READ_VALID_COLORSPACE,		    // colorspace must comply with spec
     READ_CALGRAY_DICT,              // /CalGray not followed by valid CalGray dictionary
-    READ_CALGRAY_GAMMA,             // CalGray dict /Gamma not followed by number
+    READ_GAMMA_NUMBER,              // /CalGray or /CalRGB dictionary: /Gamma not followed by number
+    READ_GAMMA_22,                  // in a bitonal image, /CalGray /Gamma must be 2.2
     READ_CALRGB_DICT,               // /CalRGB not followed by valid CalRGB dictionary
-    READ_WHITEPOINT,                // expected a whitepoint array [ r g b ]
-    READ_BLACKPOINT,                // expected a blackpoint array [ r g b ]
+    READ_CALRGB_MATRIX,             // in /CalRGB dictionary, /Matrix value is not per PDF spec
+    READ_WHITEPOINT,                // expected a whitepoint array [ X Y Z ]
+    READ_BLACKPOINT,                // expected a blackpoint array [ X Y Z ]
     READ_ICC_PROFILE,               // not a valid ICC Profile stream
     READ_ICCPROFILE_READ,           // read error while reading ICC Profile data
     READ_COLORSPACE_ARRAY,          // colorspace array syntax error - missing closing ']'?
