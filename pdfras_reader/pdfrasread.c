@@ -12,7 +12,8 @@
 ///////////////////////////////////////////////////////////////////////
 // Internal Constants
 
-#define PDFRASREAD_VERSION "0.7.6.0"
+#define PDFRASREAD_VERSION "0.7.7.0"
+// 0.7.7.0  spike   2016.09.05  slighly improved & simplified dict & stream parsing.
 // 0.7.6.0  spike   2016.09.03  /CalRGB parsing, fixed /ICCBased parse
 //                              fix! trailer parse failed if NUL in last KByte.
 // 0.7.5.0  spike   2016.09.02  pixel format and bits_per_component working (again)
@@ -69,12 +70,12 @@ typedef struct _ICCProfile ICCProfile;
 
 typedef struct t_colorspace {
     enum { CS_CALGRAY, CS_DEVICEGRAY, CS_CALRGB, CS_DEVICERGB, CS_ICCBASED } style;
-    unsigned long		bitsPerComponent;
+    unsigned long		bitsPerComponent;   // bits per component (All styles)
     double				whitePoint[3];
     double				blackPoint[3];
-    double              gamma;              // all: Gamma exponent
-    double              matrix[9];          // CalRGB: 3x3 matrix
-    ICCProfile*         piccProfile;        // ICCBased: pointer to ICC profile
+    double              gamma;              // Gamma exponent (all?)
+    double              matrix[9];          // 3x3 matrix (CALRGB only)
+    ICCProfile*         piccProfile;        // pointer to ICC profile (ICCBASED only)
 } t_colorspace;
 
 // All the information about a single page and the image it contains
@@ -83,8 +84,6 @@ typedef struct {
 	double				MediaBox[4];
 	RasterPixelFormat	format;
     t_colorspace        cs;                 // colorspace descriptor
-	double				whitePoint[3];
-	double				blackPoint[3];
 	unsigned long		width;
 	unsigned long		height;
 	unsigned long		rotation;
@@ -908,13 +907,14 @@ static int parse_long_value(t_pdfrasreader* reader, pduint32 *poff, long* pvalue
 	return TRUE;
 }
 
-// TRUE if successful, FALSE otherwise
+// TRUE if successful, FALSE otherwise.
 static int parse_dictionary(t_pdfrasreader* reader, pduint32 *poff)
 {
 	pduint32 off = *poff;
 	if (!token_eat(reader, &off, "<<")) {
 		// not a dictionary - or is mangled
-		return FALSE;
+        compliance(reader, READ_DICTIONARY, off);
+        return FALSE;
 	}
 	while (!token_eat(reader, &off, ">>")) {
         // each entry consist of a key (a /name) followed by a value.
@@ -954,7 +954,8 @@ static int parse_dictionary(t_pdfrasreader* reader, pduint32 *poff)
 static int parse_dictionary_or_stream(t_pdfrasreader* reader, pduint32 *poff, pduint32 *pstream, long* plen)
 {
 	pduint32 off = *poff;
-	if (!parse_dictionary(reader, &off)) {
+    if (!parse_dictionary(reader, &off)) {
+        // error already reported
 		return FALSE;
 	}
 	if (peekch(reader, off + 0) != 's' ||
@@ -1020,6 +1021,33 @@ static int parse_dictionary_or_stream(t_pdfrasreader* reader, pduint32 *poff, pd
 	return TRUE;
 }
 
+// Parse a stream.
+// If successful, return TRUE and advance *poff over the stream to the next token.
+// Set *pstream to the position of the stream data, and *plen to its (raw) length in bytes.
+// (Except if either pstream or plen is NULL they are ignored.)
+// Otherwise, report a 'missing stream' compliance error and return FALSE, leaving *poff unchanged.
+static int parse_stream(t_pdfrasreader* reader, pduint32 *poff, pduint32 *pstream, long* plen)
+{
+    pduint32 off = *poff;
+    pduint32 datapos = 0;
+    long datalen = 0;
+    if (pstream) *pstream = 0;
+    if (plen) *plen = 0;
+    if (!parse_dictionary_or_stream(reader, &off, &datapos, &datalen)) {
+        // compliance error already reported
+        return FALSE;
+    }
+    if (datapos == 0) {
+        // found a valid dictionary, but not a stream
+        compliance(reader, READ_STREAM, *poff);
+        return FALSE;
+    }
+    if (pstream) *pstream = datapos;
+    if (plen) *plen = datalen;
+    *poff = off;
+    return TRUE;
+}
+
 static int parse_array(t_pdfrasreader* reader, pduint32 *poff)
 {
 	skip_whitespace(reader, poff);
@@ -1039,11 +1067,12 @@ static int parse_array(t_pdfrasreader* reader, pduint32 *poff)
 	return TRUE;
 }
 
-static int parse_colorpoint(t_pdfrasreader* reader, pduint32 *poff, double point[3])
+static int parse_colorpoint(t_pdfrasreader* reader, pduint32 *poff, double point[3], int err)
 {
     skip_whitespace(reader, poff);
     if (peekch(reader, *poff) != '[') {
         // not a valid array
+        compliance(reader, err, *poff);
         return FALSE;
     }
     // step over the opening '['
@@ -1052,20 +1081,24 @@ static int parse_colorpoint(t_pdfrasreader* reader, pduint32 *poff, double point
     while (!token_eat(reader, poff, "]")) {
         if (nvalues == 3 || !token_number(reader, poff, &point[nvalues])) {
             // not a number
+            compliance(reader, err, *poff);
             return FALSE;
         }
         nvalues++;
     }
     if (nvalues != 3) {
+        compliance(reader, err, *poff);
         return FALSE;
     }
     return TRUE;
 }
 
+// Parse a CalRGB matrix (array of 9 numbers)
 static int parse_calrgb_matrix(t_pdfrasreader* reader, pduint32 *poff, double matrix[9])
 {
     skip_whitespace(reader, poff);
     if (peekch(reader, *poff) != '[') {
+        compliance(reader, READ_CALRGB_MATRIX, *poff);
         return FALSE;                   // not a valid array
     }
     // step over the opening '['
@@ -1073,13 +1106,18 @@ static int parse_calrgb_matrix(t_pdfrasreader* reader, pduint32 *poff, double ma
     int nvalues = 0;
     while (!token_eat(reader, poff, "]")) {
         if (nvalues == 9) {
+            compliance(reader, READ_CALRGB_MATRIX, *poff);
             return FALSE;               // array is too long
-        }if (!token_number(reader, poff, &matrix[nvalues])) {
+        }
+        if (!token_number(reader, poff, &matrix[nvalues])) {
+            compliance(reader, READ_CALRGB_MATRIX, *poff);
             return FALSE;               // element is not a number
         }
         nvalues++;
     }
     if (nvalues != 9) {
+        // matrix is too short
+        compliance(reader, READ_CALRGB_MATRIX, *poff);
         return FALSE;                   // array is too short
     }
     return TRUE;
@@ -1119,17 +1157,13 @@ static int parse_calgray_dictionary(t_pdfrasreader* reader, t_colorspace* pcs, p
         }
         else if (token_eat(reader, &off, "/WhitePoint")) {
             // parse & check [ r g b ]
-            if (!token_match(reader, off, "[") ||
-                !parse_colorpoint(reader, &off, pcs->whitePoint)) {
-                compliance(reader, READ_WHITEPOINT, off);
+            if (!parse_colorpoint(reader, &off, pcs->whitePoint, READ_WHITEPOINT)) {
                 return FALSE;
             }
         }
         else if (token_eat(reader, &off, "/BlackPoint")) {
             // parse & check [ r g b ]
-            if (!token_match(reader, off, "[") ||
-                !parse_colorpoint(reader, &off, pcs->blackPoint)) {
-                compliance(reader, READ_BLACKPOINT, off);
+            if (!parse_colorpoint(reader, &off, pcs->blackPoint, READ_BLACKPOINT)) {
                 return FALSE;
             }
         }
@@ -1171,17 +1205,13 @@ static int parse_calrgb_dictionary(t_pdfrasreader* reader, t_colorspace* pcs, pd
         }
         else if (token_eat(reader, &off, "/WhitePoint")) {
             // Required. Value [ X Y Z ]  X and Z must be positive. Y must be 1.
-            if (!token_match(reader, off, "[") ||
-                !parse_colorpoint(reader, &off, pcs->whitePoint)) {
-                compliance(reader, READ_WHITEPOINT, off);
+            if (!parse_colorpoint(reader, &off, pcs->whitePoint, READ_WHITEPOINT)) {
                 return FALSE;
             }
         }
         else if (token_eat(reader, &off, "/BlackPoint")) {
             // Optional. Value [ X Y Z ]  X and Z must be positive. Y must be 1.
-            if (!token_match(reader, off, "[") ||
-                !parse_colorpoint(reader, &off, pcs->blackPoint)) {
-                compliance(reader, READ_BLACKPOINT, off);
+            if (!parse_colorpoint(reader, &off, pcs->blackPoint, READ_BLACKPOINT)) {
                 return FALSE;
             }
         }
@@ -1189,7 +1219,6 @@ static int parse_calrgb_dictionary(t_pdfrasreader* reader, t_colorspace* pcs, pd
             // Optional.  Array of 9 numbers
             if (!token_match(reader, off, "[") ||
                 !parse_calrgb_matrix(reader, &off, pcs->matrix)) {
-                compliance(reader, READ_CALRGB_MATRIX, off);
                 return FALSE;
             }
         }
@@ -1202,13 +1231,19 @@ static int parse_calrgb_dictionary(t_pdfrasreader* reader, t_colorspace* pcs, pd
     return TRUE;
 }
 
+// Parse an ICC Profile stream.
+// If successful, set *ppiccProfile to point to the loaded/decompressed profile,
+// advance *poff past the stream and return TRUE.
+// Otherwise, report an appropriate compliance error
+// and return FALSE leaving *poff unmoved.
 static int parse_icc_profile(t_pdfrasreader* reader, pduint32 *poff, ICCProfile** ppiccProfile)
 {
     pduint32 off = *poff;
     *ppiccProfile = NULL;
     pduint32 datapos;
     long datalen;
-    if (!parse_dictionary_or_stream(reader, &off, &datapos, &datalen)) {
+    if (!parse_stream(reader, &off, &datapos, &datalen)) {
+        // compliance error already reported
         return FALSE;
     }
     *ppiccProfile = (ICCProfile*)malloc((size_t)datalen);
@@ -1216,13 +1251,13 @@ static int parse_icc_profile(t_pdfrasreader* reader, pduint32 *poff, ICCProfile*
         memory_error(reader, __LINE__);
         return FALSE;
     }
-    // TODO: handle compression of Profile!
+    // TODO: handle decompress/decrypt of Profile!
     if (reader->fread(reader->source, datapos, datalen, (char*)*ppiccProfile) != datalen) {
         io_error(reader, READ_ICCPROFILE_READ, __LINE__);
         free(*ppiccProfile); *ppiccProfile = NULL;
         return FALSE;
     }
-    // TODO: validate the data we read is actually an ICC Profile!
+    // TODO: validate that the data we read is actually an ICC Profile!
     *poff = off;
     return TRUE;
 }
@@ -1272,12 +1307,10 @@ static int parse_color_space(t_pdfrasreader* reader, pduint32 *poff, t_colorspac
             // could be an indirect reference
             if (parse_indirect_reference(reader, poff, &dict)) {
                 if (!parse_icc_profile(reader, &dict, &pcs->piccProfile)) {
-                    compliance(reader, READ_ICC_PROFILE, dict);
                     return FALSE;
                 }
             }
             else if (!parse_icc_profile(reader, poff, &pcs->piccProfile)) {
-                compliance(reader, READ_ICC_PROFILE, dict);
                 return FALSE;
             }
         }
@@ -1453,7 +1486,7 @@ static int read_trailer_dict(t_pdfrasreader* reader, pduint32 *poff)
 		return FALSE;
 	}
     if (!parse_dictionary(reader, poff)) {
-        compliance(reader, READ_TRAILER_DICT, *poff);
+        // error already reported
         return FALSE;
     }
     return TRUE;
@@ -1915,16 +1948,13 @@ static int get_strip_info(t_pdfrasreader* reader, int p, int s, t_pdfstripinfo* 
     // Parse the strip stream and locate its data
     // Among other things, this finds and checks the /Length key
     pduint32 pos = pinfo->pos;
-    if (!parse_dictionary_or_stream(reader, &pos, &pinfo->data_pos, &pinfo->raw_size)) {
+    if (!parse_stream(reader, &pos, &pinfo->data_pos, &pinfo->raw_size)) {
         // strip stream not found or invalid
         // compliance errors have already been reported
         return FALSE;
     }
-    if (pinfo->pos == 0 || pinfo->raw_size == 0) {
-        // dictionary, but not a stream!
-        compliance(reader, READ_STRIP_NOT_STREAM, pinfo->pos);
-        return FALSE;
-    }
+    assert(pinfo->pos != 0);
+    assert(pinfo->raw_size > 0);
     pduint32 val;
     // /Type entry is optional, but if present value must be /XObject   [ISO 32000 8.9.5]
     if (dictionary_lookup(reader, pinfo->pos, "/Type", &val) && !token_match(reader, val, "/XObject")) {
@@ -2348,9 +2378,12 @@ static const char* error_code_description(int code)
     case READ_FILE_EOF_MARKER:      return "%%EOF not found near end of file (prob. not a PDF)";
     case READ_FILE_STARTXREF:       return "startxref not found near end of file (so prob. not a PDF)";
     case READ_FILE_BAD_STARTXREF:   return "startxref found - but invalid syntax or value";
+    case READ_DICTIONARY:           return "expected a dictionary object";
+    case READ_DICT_NAME_KEY:        return "every dictionary key must be a name (/xyz)";
     case READ_DICT_OBJSTM:          return "dictionary with /Type /ObjStm  S6.2 P4";
     case READ_DICT_EOF:             return "end-of-file in dictionary. where is the '>>'?";
     case READ_DICT_VALUE:           return "malformed or missing value in dictionary";
+    case READ_STREAM:               return "expected a stream object";
     case READ_STREAM_CRLF:          return "stream keyword followed by CR but then no LF";
     case READ_STREAM_LINEBREAK:     return "stream keyword not followed by CRLF or LF";
     case READ_STREAM_LENGTH:        return "stream dictionary /Length entry not found";
@@ -2358,6 +2391,9 @@ static const char* error_code_description(int code)
     case READ_STREAM_ENDSTREAM:     return "endstream not found where expected";
     case READ_OBJECT_EOF:           return "end-of-file where a PDF value or object was expected";
     case READ_OBJECT:               return "expected an object,no object starts with this character";
+    case READ_STRIP_REF:            return "strip entry in xobject dict must be an indirect reference";
+    case READ_STRIP_DICT:           return "strip must start with a dictionary";
+    case READ_STRIP_MISSING:        return "missing strip entry in xobject dict";
     case READ_STRIP_TYPE_XOBJECT:   return "strip /Type is not /XObject [PDF2 8.9.5]";
     case READ_STRIP_SUBTYPE:        return "strip lacks /Subtype or its value isn't /Image";
     case READ_STRIP_BITSPERCOMPONENT: return "strip must have /BitsPerComponent value of 1, 8 or 16";

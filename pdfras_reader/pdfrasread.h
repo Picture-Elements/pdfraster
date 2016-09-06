@@ -247,6 +247,7 @@ typedef enum {
     READ_OBJ_DEF,                   // xref entry doesn't point to valid, matching obj definition
     READ_NO_SUCH_XREF,              // indirect object not found in xref table
     READ_GEN_ZERO,                  // indirect object with generation not 0.
+    READ_DICTIONARY,                // expected a dictionary object
     READ_DICT_NAME_KEY,             // every dictionary key must be a name (/xyz)
     READ_DICT_OBJSTM,               // dictionary with /Type /ObjStm  S6.2 P4
     READ_DICT_EOF,                  // end-of-file in dictionary. where is the '>>'?
@@ -257,6 +258,7 @@ typedef enum {
     READ_STREAM_LENGTH_INT,         // stream - /Length value isn't an integer literal
     READ_STREAM_ENDSTREAM,          // endstream not found where expected
     READ_OBJECT_EOF,                // end-of-file where a PDF value or object was expected
+    READ_STREAM,                    // expected a stream object
     READ_OBJECT,                    // expected an object, no object starts with this character
     READ_MEDIABOX_ARRAY,            // MediaBox value must be an array
     READ_MEDIABOX_ELEMENTS,         // MediaBox must contain 4 numbers: [0 0 w h]
@@ -266,7 +268,6 @@ typedef enum {
 	READ_XOBJECT_ENTRY,				// all entries in xobject dict must be /strip<n>
 	READ_STRIP_REF,			        // strip entry in xobject dict must be an indirect reference
     READ_STRIP_DICT,                // strip must start with a dictionary
-    READ_STRIP_NOT_STREAM,          // strip must be a stream object
     READ_STRIP_MISSING,             // missing strip entry in xobject dict
     READ_STRIP_TYPE_XOBJECT,        // strip /Type is not /XObject [PDF2 8.9.5]
 	READ_STRIP_SUBTYPE,				// strip lacks /Subtype or its value isn't /Image
@@ -285,7 +286,7 @@ typedef enum {
     READ_GAMMA_NUMBER,              // /CalGray or /CalRGB dictionary: /Gamma not followed by number
     READ_GAMMA_22,                  // in a bitonal image, /CalGray /Gamma must be 2.2
     READ_CALRGB_DICT,               // /CalRGB not followed by valid CalRGB dictionary
-    READ_CALRGB_MATRIX,             // in /CalRGB dictionary, /Matrix value is not per PDF spec
+    READ_CALRGB_MATRIX,             // /CalRGB /Matrix value is not an array of 9 numbers.
     READ_WHITEPOINT,                // expected a whitepoint array [ X Y Z ]
     READ_BLACKPOINT,                // expected a blackpoint array [ X Y Z ]
     READ_ICC_PROFILE,               // not a valid ICC Profile stream
