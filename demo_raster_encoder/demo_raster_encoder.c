@@ -170,6 +170,7 @@ int write_0page_file(t_OS os, const char *filename)
 	// clean up
 	fclose(fp);
 	pdfr_encoder_destroy(enc);
+    printf("  %s\n", filename);
 	return 0;
 }
 
@@ -207,7 +208,8 @@ int write_bitonal_uncompressed_file(t_OS os, const char *filename)
 	// clean up
 	fclose(fp);
 	pdfr_encoder_destroy(enc);
-	return 0;
+    printf("  %s\n", filename);
+    return 0;
 }
 
 void write_bitonal_ccitt_page(t_pdfrasencoder* enc)
@@ -246,7 +248,8 @@ int write_bitonal_ccitt_file(t_OS os, const char *filename, int uncal)
 	// clean up
 	fclose(fp);
 	pdfr_encoder_destroy(enc);
-	return 0;
+    printf("  %s\n", filename);
+    return 0;
 }
 
 void write_gray8_uncomp_page(t_pdfrasencoder* enc)
@@ -287,7 +290,8 @@ int write_gray8_uncompressed_file(t_OS os, const char *filename)
 	// clean up
 	fclose(fp);
 	pdfr_encoder_destroy(enc);
-	return 0;
+    printf("  %s\n", filename);
+    return 0;
 }
 
 void write_gray8_jpeg_page(t_pdfrasencoder* enc)
@@ -331,7 +335,8 @@ int write_gray8_jpeg_file(t_OS os, const char *filename)
 	// clean up
 	fclose(fp);
 	pdfr_encoder_destroy(enc);
-	return 0;
+    printf("  %s\n", filename);
+    return 0;
 }
 
 void write_gray16_uncomp_page(t_pdfrasencoder* enc)
@@ -369,7 +374,8 @@ int write_gray16_uncompressed_file(t_OS os, const char *filename)
 	// clean up
 	fclose(fp);
 	pdfr_encoder_destroy(enc);
-	return 0;
+    printf("  %s\n", filename);
+    return 0;
 }
 
 void write_rgb24_uncomp_page(t_pdfrasencoder* enc)
@@ -409,7 +415,8 @@ int write_rgb24_uncompressed_file(t_OS os, const char* filename)
 	// clean up
 	fclose(fp);
 	pdfr_encoder_destroy(enc);
-	return 0;
+    printf("  %s\n", filename);
+    return 0;
 }
 
 void write_rgb24_uncomp_multistrip_page(t_pdfrasencoder* enc)
@@ -456,7 +463,8 @@ int write_rgb24_uncompressed_multistrip_file(t_OS os, const char* filename)
 	// clean up
 	fclose(fp);
 	pdfr_encoder_destroy(enc);
-	return 0;
+    printf("  %s\n", filename);
+    return 0;
 }
 
 // write an sRGB 8-bit/channel color image with JPEG compression
@@ -498,7 +506,8 @@ int write_rgb24_jpeg_file(t_OS os, const char *filename)
 	// clean up
 	fclose(fp);
 	pdfr_encoder_destroy(enc);
-	return 0;
+    printf("  %s\n", filename);
+    return 0;
 }
 
 int write_allformat_multipage_file(t_OS os, const char *filename)
@@ -548,7 +557,8 @@ int write_allformat_multipage_file(t_OS os, const char *filename)
 	fclose(fp);
 	pdfr_encoder_destroy(enc);
 
-	return 0;
+    printf("  %s\n", filename);
+    return 0;
 }
 
 void write_rgb24_jpeg_multistrip_page(t_pdfrasencoder* enc)
@@ -596,7 +606,8 @@ int write_rgb24_jpeg_multistrip_file(t_OS os, const char* filename)
 	// clean up
 	fclose(fp);
 	pdfr_encoder_destroy(enc);
-	return 0;
+    printf("  %s\n", filename);
+    return 0;
 }
 
 
