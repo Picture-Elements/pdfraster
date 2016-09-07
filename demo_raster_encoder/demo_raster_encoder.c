@@ -221,7 +221,7 @@ void write_bitonal_ccitt_page(t_pdfrasencoder* enc)
 	pdfr_encoder_end_page(enc);
 }
 
-int write_bitonal_ccitt_file(t_OS os, const char *filename)
+int write_bitonal_ccitt_file(t_OS os, const char *filename, int uncal)
 {
 	// Write a file: CCITT-compressed B&W 300 DPI US Letter (scanned)
 	FILE *fp = fopen(filename, "wb");
@@ -237,6 +237,7 @@ int write_bitonal_ccitt_file(t_OS os, const char *filename)
 	pdfr_encoder_set_creator(enc, "raster_encoder_demo 1.0");
 	pdfr_encoder_set_keywords(enc, "raster bitonal CCITT");
 	pdfr_encoder_set_subject(enc, "BW 1-bit CCITT-G4 compressed sample output");
+    pdfr_encoder_set_bitonal_uncalibrated(enc, uncal);
 
 	write_bitonal_ccitt_page(enc);
 
@@ -303,7 +304,7 @@ void write_gray8_jpeg_page(t_pdfrasencoder* enc)
 	pdfr_encoder_end_page(enc);
 }
 
-int write_gray8_jpeg_file(t_OS os, const char *filename, int devColor)
+int write_gray8_jpeg_file(t_OS os, const char *filename)
 {
 	// Write a file: 4" x 5.5" at 2.0 DPI, uncompressed 8-bit grayscale
 	FILE *fp = fopen(filename, "wb");
@@ -317,7 +318,6 @@ int write_gray8_jpeg_file(t_OS os, const char *filename, int devColor)
 	t_pdfrasencoder* enc = pdfr_encoder_create(PDFRAS_API_LEVEL, &os);
 	pdfr_encoder_set_creator(enc, "raster_encoder_demo 1.0");
 	//pdfr_encoder_set_subject(enc, "GRAY8 JPEG sample output");
-	pdfr_encoder_set_device_colorspace(enc, devColor);
 
 	time_t tcd;
 	pdfr_encoder_get_creation_date(enc, &tcd);
@@ -616,13 +616,13 @@ int main(int argc, char** argv)
 
 	write_bitonal_uncompressed_file(os, "sample bw1 uncompressed.pdf");
 
-	write_bitonal_ccitt_file(os, "sample bw1 ccitt.pdf");
+	write_bitonal_ccitt_file(os, "sample bw1 ccitt.pdf", 0);
 
-	write_gray8_uncompressed_file(os, "sample gray8 uncompressed.pdf");
+    write_bitonal_ccitt_file(os, "sample bitonal uncal.pdf", 1);
 
-	write_gray8_jpeg_file(os, "sample gray8-calibrated jpeg.pdf", 0);
+    write_gray8_uncompressed_file(os, "sample gray8 uncompressed.pdf");
 
-	write_gray8_jpeg_file(os, "sample gray8-device jpeg.pdf", 1);
+	write_gray8_jpeg_file(os, "sample gray8 jpeg.pdf");
 
 	write_gray16_uncompressed_file(os, "sample gray16 uncompressed.pdf");
 

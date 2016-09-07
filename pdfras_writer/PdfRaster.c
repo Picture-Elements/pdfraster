@@ -27,14 +27,14 @@ typedef struct t_pdfrasencoder {
 	t_pdvalue			info;
 	t_pdvalue			trailer;
 	// optional document objects
-	t_pdvalue			rgbColorspace;		// non-device colorspace for RGB images
+	t_pdvalue			rgbColorspace;		// current colorspace for RGB images
 	// current page object and related values
 	t_pdvalue			currentPage;
 	double				xdpi;				// horizontal resolution, pixels/inch
 	double				ydpi;				// vertical resolution, pixels/inch
 	int					rotation;			// page rotation (degrees clockwise)
 	RasterPixelFormat	pixelFormat;		// how pixels are represented
-	pdbool				devColor;			// use uncalibrated (device) colorspace
+	pdbool				bitonalUncal;		// use uncalibrated /DeviceGray for bitonal images
 	int					width;				// image width in pixels
 	RasterCompression	compression;		// how data is compressed
 	int					strips;				// number of strips on current page
@@ -181,9 +181,17 @@ void pdfr_encoder_set_compression(t_pdfrasencoder* enc, RasterCompression comp)
 	enc->compression = comp;
 }
 
-void pdfr_encoder_set_device_colorspace(t_pdfrasencoder* enc, int devColor)
+int pdfr_encoder_set_bitonal_uncalibrated(t_pdfrasencoder* enc, int uncal)
 {
-	enc->devColor = (devColor != 0);
+    int previous = (enc->bitonalUncal != 0);
+	enc->bitonalUncal = (uncal != 0);
+    return previous;
+}
+
+void pdfr_encoder_define_calrgb_colorspace(t_pdfrasencoder* enc, double gamma[3], double black[3], double white[3], double matrix[9])
+{
+    enc->rgbColorspace =
+        pd_make_calrgb_colorspace(enc->pool, gamma, black, white, matrix);
 }
 
 void pdfr_encoder_define_rgb_icc_colorspace(t_pdfrasencoder* enc, const pduint8 *profile, size_t len)
@@ -203,8 +211,8 @@ int pdfr_encoder_start_page(t_pdfrasencoder* enc, int width)
 {
 	if (IS_DICT(enc->currentPage)) {
 		pdfr_encoder_end_page(enc);
-		assert(IS_NULL(enc->currentPage));
 	}
+    assert(IS_NULL(enc->currentPage));
 	enc->width = width;
 	enc->strips = 0;				// number of strips written to current page
 	enc->height = 0;				// height of current page so far
@@ -217,6 +225,7 @@ int pdfr_encoder_start_page(t_pdfrasencoder* enc, int width)
 	// Start a new page (of unknown height)
 	enc->currentPage = pd_page_new_simple(enc->pool, enc->xref, enc->catalog, W, 0);
 	assert(IS_REFERENCE(enc->currentPage));
+    assert(IS_DICT(pd_reference_get_value(enc->currentPage)));
 
 	return 0;
 }
@@ -247,7 +256,7 @@ t_pdvalue pdfr_encoder_get_rgb_colorspace(t_pdfrasencoder* enc)
 {
     // if there's no current calibrated RGB ColorSpace
 	if (IS_NULL(enc->rgbColorspace)) {
-        // define the default calibrated RGB colorspace as
+        // define the default calibrated RGB colorspace as an ICCBased
         // sRGB colorspace:
         pdfr_encoder_define_rgb_icc_colorspace(enc, NULL, 0);
 	}
@@ -265,7 +274,7 @@ t_pdvalue pdfr_encoder_get_calgray_colorspace(t_pdfrasencoder* enc)
 	double white[3] = { 1.0, 1.0, 1.0 };
 	// "The Gamma  entry shall be present in the CalGray colour space dictionary with a value of 2.2."
 	double gamma = 2.2;
-	return pd_make_calgray_colorspace(enc->pool, black, white, gamma);
+	return pd_make_calgray_colorspace(enc->pool, gamma, black, white);
 }
 
 t_pdvalue pdfr_encoder_get_colorspace(t_pdfrasencoder* enc)
@@ -273,24 +282,21 @@ t_pdvalue pdfr_encoder_get_colorspace(t_pdfrasencoder* enc)
 	switch (enc->pixelFormat) {
 	case PDFRAS_RGB24:
 	case PDFRAS_RGB48:
-		// unless told to use device colorspace, use calibrated colorspace
-		if (enc->devColor) {
-			return pdatomvalue(PDA_DeviceRGB);
-		}
-		else {
-            // retrieve the current calibrated colorspace
-			return pdfr_encoder_get_rgb_colorspace(enc);
-		}
+        // retrieve the current calibrated colorspace, which may be either
+        // a CalRGB space or an ICCBased space.
+        return pdfr_encoder_get_rgb_colorspace(enc);
 	case PDFRAS_BITONAL:
 		// "Bitonal images shall be represented by an image XObject dictionary with DeviceGray
 		// or CalGray as the value of its ColorSpace entry..."
-		if (enc->devColor) {
+		if (enc->bitonalUncal) {
 			return pdatomvalue(PDA_DeviceGray);
 		}
+        // else use /CalGray
 	case PDFRAS_GRAY8:
 	case PDFRAS_GRAY16:
 		// "Grayscale images shall be represented by an image XObject dictionary with CalGray
 		// as the value of its ColorSpace entry..."
+        // Note, DeviceGray and ICCBased are not options.
 		return pdfr_encoder_get_calgray_colorspace(enc);
 	default:
 		break;

@@ -286,7 +286,10 @@ typedef enum {
     READ_GAMMA_NUMBER,              // /CalGray or /CalRGB dictionary: /Gamma not followed by number
     READ_GAMMA_22,                  // in a bitonal image, /CalGray /Gamma must be 2.2
     READ_CALRGB_DICT,               // /CalRGB not followed by valid CalRGB dictionary
-    READ_CALRGB_MATRIX,             // /CalRGB /Matrix value is not an array of 9 numbers.
+    READ_MATRIX,                    // /CalRGB /Matrix value does not start with '['
+    READ_MATRIX_ELEMENT,            // /CalRGB /Matrix array element is not a number
+    READ_MATRIX_TOO_LONG,           // /CalRGB /Matrix array has more than 9 elements
+    READ_MATRIX_TOO_SHORT,          // /CalRGB /Matrix array ended with fewer than 9 elements
     READ_WHITEPOINT,                // expected a whitepoint array [ X Y Z ]
     READ_BLACKPOINT,                // expected a blackpoint array [ X Y Z ]
     READ_ICC_PROFILE,               // not a valid ICC Profile stream

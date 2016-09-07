@@ -14,7 +14,8 @@ extern "C" {
 // Version of the file format we support (or at least, write)
 #define PDFRASTER_SPEC_VERSION "1.0"
 
-#define PDFRAS_LIBRARY_VERSION "0.15"
+#define PDFRAS_LIBRARY_VERSION "0.16"
+// 0.16 spike   2016.09.06  fix: align allowed colorspaces with spec, support /CalRGB.
 // 0.15 spike   2016.08.18  fix: length of strip streams was wrong.
 // 0.14	spike	2016.07.20	pdfras_writer_managed compiles & links /clr!
 // 0.13	spike	2016.07.13	moved signature to end of trailer dict
@@ -101,21 +102,32 @@ void pdfr_encoder_set_pixelformat(t_pdfrasencoder* enc, RasterPixelFormat format
 // Set the compression mode/algorithm/technique for subsequent pages
 void pdfr_encoder_set_compression(t_pdfrasencoder* enc, RasterCompression comp);
 
-// Turn on or off 'uncalibrated' (raw, device) color spaces for subsequent images.
-// By default, calibrated color spaces are assumed.
-// devColor=1 for raw/device, devColor=0 for default calibrated colorspace.
-void pdfr_encoder_set_device_colorspace(t_pdfrasencoder* enc, int devColor);
+// Turn on or off 'uncalibrated' (raw, device) colorspace for subsequent
+// bitonal images.  Only bitonal images are affected.
+// By default, bitonal images are written with a /CalGray colorspace with
+// Gamma 2.2, BlackPoint [ 0 0 0] and WhitePoint [ 1 1 1 ]
+// uncal = 0 means use the calibrated /CalGray colorspace.
+// uncal <> 0 means use uncalibrated /DeviceGray colorspace.
+// Return value is the previous setting, either 1 or 0.
+int pdfr_encoder_set_bitonal_uncalibrated(t_pdfrasencoder* enc, int uncal);
 
-// specify an ICC-profile based colorspace for subsequent RGB images.
+// Specify an ICC-profile based colorspace for subsequent RGB images.
 // (By default, RGB images are assumed to be sRGB)
 // profile must point to a valid ICC color profile of len bytes.
 // (the profile is not validated but is used verbatim)
-// If profile is NULL, the standard sRGB profile is used and the len value is ignored.
+// If profile is NULL, the standard sRGB profile is selected and the len value is ignored.
 void pdfr_encoder_define_rgb_icc_colorspace(t_pdfrasencoder* enc, const pduint8 *profile, size_t len);
+
+// Define the colorspace for subsequent color images as a /CalRGB space, with
+// the given parameters (see PDF for details). Color images written after this
+// will be assigned the specified colorspace.  Gray and bitonal images are not affected.
+// Any of the array parameters can be NULL in which case the PDF default is used.
+// (For whitepoint, the default is taken to be [ 1 1 1 ].)
+void pdfr_encoder_define_calrgb_colorspace(t_pdfrasencoder* enc, double gamma[3], double black[3], double white[3], double matrix[9]);
 
 // Set the viewing angle for the current page (if any) and subsequent pages.
 // The angle is a rotation clockwise in degrees and must be a multiple of 90.
-// This angle is initially 0.
+// The viewing angle is initially 0.
 void pdfr_encoder_set_rotation(t_pdfrasencoder* enc, int degCW);
 
 // Start encoding a page in the current document.

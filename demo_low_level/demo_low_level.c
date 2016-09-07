@@ -111,7 +111,7 @@ int main(int argc, char **argv)
 	// Should this be D65? [0.9505, 1.0000, 1.0890]?  Does it matter?
 	double white[3] = { 1.0, 1.0, 1.0 };
 	double gamma = 2.2;
-	t_pdvalue calgray = pd_make_calgray_colorspace(os.allocsys, black, white, gamma);
+	t_pdvalue calgray = pd_make_calgray_colorspace(os.allocsys, gamma, black, white);
 	t_pdvalue image = pd_image_new_simple(os.allocsys, xref, onimagedataready, 0, 8, 8, 8, kCompNone, kCCIITTG4, PD_FALSE, calgray);
 	pd_page_add_image(apage, AtomImg0, image);
 

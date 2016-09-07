@@ -82,6 +82,8 @@ char *__ATOM_WhitePoint = "WhitePoint";
 char *__ATOM_Gamma = "Gamma";
 char *__ATOM_N = "N";
 char *__ATOM_ASCIIHexDecode = "ASCIIHexDecode";
+char* __ATOM_CalRGB = "CalRGB";
+char* __ATOM_Matrix = "Matrix";
 
 
 const char *pd_atom_name(t_pdatom atom)

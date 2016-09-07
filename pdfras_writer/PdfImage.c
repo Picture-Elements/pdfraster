@@ -73,8 +73,8 @@ static t_pdvalue MakeCCITTParms(t_pdmempool *alloc, pduint32 width, pduint32 hei
 }
 
 // Create & return a CalGray colorspace value
-// with BlackPoint, WhitePoint and Gamma
-t_pdvalue pd_make_calgray_colorspace(t_pdmempool *alloc, double black[3], double white[3], double gamma)
+// with specified Gamma, BlackPoint and WhitePoint.
+t_pdvalue pd_make_calgray_colorspace(t_pdmempool *alloc, double gamma, double black[3], double white[3])
 {
 	// A calibrated grayscale colorspace is an array [/CalGray <<dict>>]
 	// Legal dictionary entries: WhitePoint, BlackPoint and Gamma.
@@ -108,6 +108,63 @@ t_pdvalue pd_make_calgray_colorspace(t_pdmempool *alloc, double black[3], double
 	// all done.
 	return pdarrayvalue(cs);
 }
+
+// Create & return a calibrated RGBe (/CalRGB) colorspace,
+// with given Gamma, BlackPoint, WhitePoint and transform matrix. See PDF spec.
+t_pdvalue pd_make_calrgb_colorspace(t_pdmempool *alloc, double gamma[3], double black[3], double white[3], double matrix[9])
+{
+    // A calibrated RGB colorspace is an array [/CalRGB <<dict>>]
+    // Legal dictionary entries: Gamma, WhitePoint, BlackPoint, and Matrix.
+    //
+    if (!white) {
+        double default_white[3] = { 1, 1, 1 };
+        white = default_white;
+    }
+    // Create the color space dictionary
+    t_pdvalue csdict = pd_dict_new(alloc, 4);
+    // Gamma defaults to [ 1 1 1 ] so only write it if not all 1's
+    if (gamma && (gamma[0] != 1 || gamma[1] != 1 || gamma[2] != 1)) {
+        // add gamma array
+        t_pdarray* gams = pd_array_new(alloc, 3);
+        pd_array_add(gams, pdfloatvalue(gamma[0]));
+        pd_array_add(gams, pdfloatvalue(gamma[1]));
+        pd_array_add(gams, pdfloatvalue(gamma[2]));
+        pd_dict_put(csdict, PDA_Gamma, pdarrayvalue(gams));
+    }
+    // BlackPoint defaults to [0.0 0.0 0.0] so only include it if not all 0's
+    if (black && (black[0] || black[1] || black[2])) {
+        // add blackpoint array
+        t_pdarray* blackPt = pd_array_new(alloc, 3);
+        pd_array_add(blackPt, pdfloatvalue(black[0]));
+        pd_array_add(blackPt, pdfloatvalue(black[1]));
+        pd_array_add(blackPt, pdfloatvalue(black[2]));
+        pd_dict_put(csdict, PDA_BlackPoint, pdarrayvalue(blackPt));
+    }
+    {	// add whitepoint array
+        t_pdarray* whitePt = pd_array_new(alloc, 3);
+        pd_array_add(whitePt, pdfloatvalue(white[0]));
+        pd_array_add(whitePt, pdfloatvalue(white[1]));
+        pd_array_add(whitePt, pdfloatvalue(white[2]));
+        pd_dict_put(csdict, PDA_WhitePoint, pdarrayvalue(whitePt));
+    }
+    if (matrix) {
+        // add transform matrix
+        t_pdarray* m = pd_array_new(alloc, 9);
+        for (int i = 0; i < 9; i++) {
+            pd_array_add(m, pdfloatvalue(matrix[i]));
+        }
+        pd_dict_put(csdict, PDA_Matrix, pdarrayvalue(m));
+    }
+    // create the color space (an array)
+    t_pdarray* cs = pd_array_new(alloc, 3);
+    // tag it as /CalRGB
+    pd_array_add(cs, pdatomvalue(PDA_CalRGB));
+    // plug in the color space dictionary
+    pd_array_add(cs, csdict);
+    // all done.
+    return pdarrayvalue(cs);
+}
+
 
 typedef struct {
 	const pduint8*	pointer;

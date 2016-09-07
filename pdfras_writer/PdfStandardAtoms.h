@@ -74,6 +74,8 @@ extern "C" {
 #define PDA_Gamma ((t_pdatom)__ATOM_Gamma)
 #define PDA_N		((t_pdatom)__ATOM_N)
 #define PDA_ASCIIHexDecode	((t_pdatom)__ATOM_ASCIIHexDecode)
+#define PDA_CalRGB ((t_pdatom)__ATOM_CalRGB)
+#define PDA_Matrix ((t_pdatom)__ATOM_Matrix)
 
 extern char* __ATOM_UNDEFINED_ATOM;
 extern char* __ATOM_Type;
@@ -139,6 +141,8 @@ extern char* __ATOM_WhitePoint;
 extern char* __ATOM_Gamma;
 extern char* __ATOM_N;
 extern char* __ATOM_ASCIIHexDecode;
+extern char* __ATOM_CalRGB;
+extern char* __ATOM_Matrix;
 
 #ifdef __cplusplus
 }

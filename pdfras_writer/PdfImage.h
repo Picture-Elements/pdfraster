@@ -23,9 +23,15 @@ typedef enum {
 	kCCITTG32D
 } e_CCITTKind;
 
-// Create & return a calibrated grayscale colorspace
-// with given BlackPoint, WhitePoint and Gamma - see PDF spec.
-extern t_pdvalue pd_make_calgray_colorspace(t_pdmempool *alloc, double black[3], double white[3], double gamma);
+// Create & return a calibrated grayscale (/CalGray) colorspace,
+// with given Gamma, BlackPoint and WhitePoint. See PDF for details.
+extern t_pdvalue pd_make_calgray_colorspace(t_pdmempool *alloc, double gamma, double black[3], double white[3]);
+
+// Create & return a calibrated RGBe (/CalRGB) colorspace,
+// with given Gamma, BlackPoint, WhitePoint and transform matrix. See PDF spec.
+// Any of the array parameters may be NULL which means 'use the PDF default'.
+// (the default white is [ 1 1 1].)
+extern t_pdvalue pd_make_calrgb_colorspace(t_pdmempool *alloc, double gamma[3], double black[3], double white[3], double matrix[9]);
 
 // Create & return a standard sRGB colorspace (as an ICCBased colorspace).
 // The ICC profile is per IEC61966-2.1

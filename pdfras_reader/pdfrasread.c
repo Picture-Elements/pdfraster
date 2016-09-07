@@ -1093,12 +1093,14 @@ static int parse_colorpoint(t_pdfrasreader* reader, pduint32 *poff, double point
     return TRUE;
 }
 
-// Parse a CalRGB matrix (array of 9 numbers)
+// Parse a /CalRGB /Matrix value (array of 9 numbers)
+// If successful, update *poff and return TRUE.
+// Otherwise report a compliance error and return FALSE with *poff unmoved.
 static int parse_calrgb_matrix(t_pdfrasreader* reader, pduint32 *poff, double matrix[9])
 {
     skip_whitespace(reader, poff);
     if (peekch(reader, *poff) != '[') {
-        compliance(reader, READ_CALRGB_MATRIX, *poff);
+        compliance(reader, READ_MATRIX, *poff);
         return FALSE;                   // not a valid array
     }
     // step over the opening '['
@@ -1106,31 +1108,33 @@ static int parse_calrgb_matrix(t_pdfrasreader* reader, pduint32 *poff, double ma
     int nvalues = 0;
     while (!token_eat(reader, poff, "]")) {
         if (nvalues == 9) {
-            compliance(reader, READ_CALRGB_MATRIX, *poff);
+            compliance(reader, READ_MATRIX_TOO_LONG, *poff);
             return FALSE;               // array is too long
         }
         if (!token_number(reader, poff, &matrix[nvalues])) {
-            compliance(reader, READ_CALRGB_MATRIX, *poff);
+            compliance(reader, READ_MATRIX_ELEMENT, *poff);
             return FALSE;               // element is not a number
         }
         nvalues++;
     }
     if (nvalues != 9) {
         // matrix is too short
-        compliance(reader, READ_CALRGB_MATRIX, *poff);
+        compliance(reader, READ_MATRIX_TOO_SHORT, *poff);
         return FALSE;                   // array is too short
     }
     return TRUE;
 }
 
 // parse & validate a /CalGray dictionary starting at *poff.
-// If (and only if) successful, update *poff to point to the token after the dictionary.
+// If successful, update *poff to point to the token after the dictionary.
+// Otherwise, report a compliance error and return FALSE with *poff unmoved.
 static int parse_calgray_dictionary(t_pdfrasreader* reader, t_colorspace* pcs, pduint32 *poff)
 {
     // TODO: check for missing or duplicate keys!
     pduint32 off = *poff;
     if (!token_eat(reader, &off, "<<")) {
         // not a dictionary - or is mangled
+        compliance(reader, READ_CALGRAY_DICT, off);
         return FALSE;
     }
     while (!token_eat(reader, &off, ">>")) {
@@ -1184,6 +1188,7 @@ static int parse_calrgb_dictionary(t_pdfrasreader* reader, t_colorspace* pcs, pd
     pduint32 off = *poff;
     if (!token_eat(reader, &off, "<<")) {
         // not a dictionary - or is mangled
+        compliance(reader, READ_CALRGB_DICT, off);
         return FALSE;
     }
     while (!token_eat(reader, &off, ">>")) {
@@ -1217,8 +1222,7 @@ static int parse_calrgb_dictionary(t_pdfrasreader* reader, t_colorspace* pcs, pd
         }
         else if (token_eat(reader, &off, "/Matrix")) {
             // Optional.  Array of 9 numbers
-            if (!token_match(reader, off, "[") ||
-                !parse_calrgb_matrix(reader, &off, pcs->matrix)) {
+            if (!parse_calrgb_matrix(reader, &off, pcs->matrix)) {
                 return FALSE;
             }
         }
@@ -1278,12 +1282,10 @@ static int parse_color_space(t_pdfrasreader* reader, pduint32 *poff, t_colorspac
             pduint32 dict = *poff;
             if (parse_indirect_reference(reader, poff, &dict)) {
                 if (!parse_calgray_dictionary(reader, pcs, &dict)) {
-                    compliance(reader, READ_CALGRAY_DICT, dict);
                     return FALSE;
                 }
             }
             else if (!parse_calgray_dictionary(reader, pcs, poff)) {
-                compliance(reader, READ_CALGRAY_DICT, *poff);
                 return FALSE;
             }
         }
@@ -1292,12 +1294,10 @@ static int parse_color_space(t_pdfrasreader* reader, pduint32 *poff, t_colorspac
             pduint32 dict = *poff;
             if (parse_indirect_reference(reader, poff, &dict)) {
                 if (!parse_calrgb_dictionary(reader, pcs, &dict)) {
-                    compliance(reader, READ_CALRGB_DICT, dict);
                     return FALSE;
                 }
             }
             else if (!parse_calrgb_dictionary(reader, pcs, poff)) {
-                compliance(reader, READ_CALRGB_DICT, dict);
                 return FALSE;
             }
         }
@@ -2409,6 +2409,10 @@ static const char* error_code_description(int code)
     case READ_VALID_COLORSPACE:     return "colorspace must comply with spec";
     case READ_CALGRAY_DICT:         return "/CalGray not followed by valid CalGray dictionary";
     case READ_CALRGB_DICT:          return "/CalRGB not followed by valid CalRGB dictionary";
+    case READ_MATRIX:               return "/CalRGB /Matrix value does not start with '['";
+    case READ_MATRIX_ELEMENT:       return "/CalRGB /Matrix array element is not a number";
+    case READ_MATRIX_TOO_LONG:      return "/CalRGB /Matrix array has more than 9 elements";
+    case READ_MATRIX_TOO_SHORT:     return "/CalRGB /Matrix array ended with fewer than 9 elements";
     case READ_ICC_PROFILE:          return "not a valid ICC Profile stream";
     case READ_ICCPROFILE_READ:      return "read error while reading ICC Profile data";
     case READ_COLORSPACE_ARRAY:     return "colorspace array syntax error - missing closing ']'?";
