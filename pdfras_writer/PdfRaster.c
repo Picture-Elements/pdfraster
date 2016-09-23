@@ -484,18 +484,19 @@ long pdfr_encoder_bytes_written(t_pdfrasencoder* enc)
 	return pd_outstream_pos(enc->stm);
 }
 
-static void pdfr_write_sig(t_pdvalue trailer, t_pdoutstream *stm)
+static int pdfr_sig_handler(t_pdoutstream *stm, void* cookie, PdfOutputEventCode eventid)
 {
-    pd_puts(stm, "\n%PDF-raster-" PDFRASTER_SPEC_VERSION "\n");
+    pd_puts(stm, "%PDF-raster-" PDFRASTER_SPEC_VERSION "\n");
+    return 0;
 }
+
 
 void pdfr_encoder_end_document(t_pdfrasencoder* enc)
 {
     t_pdoutstream* stm = enc->stm;
 	pdfr_encoder_end_page(enc);
 	// remember to write our PDF/raster signature marker
-	// at the end of the trailer dict:
-	__pd_dict_set_pre_close(enc->trailer, pdfr_write_sig);
+    pd_outstream_set_event_handler(stm, PDF_EVENT_BEFORE_STARTXREF, pdfr_sig_handler, NULL);
 	pd_write_endofdocument(stm, enc->xref, enc->catalog, enc->info, enc->trailer);
 
 	// Note: we leave all the final data structures intact in case the client

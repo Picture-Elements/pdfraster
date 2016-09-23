@@ -14,7 +14,8 @@ extern "C" {
 // Version of the file format we support (or at least, write)
 #define PDFRASTER_SPEC_VERSION "1.0"
 
-#define PDFRAS_LIBRARY_VERSION "0.16"
+#define PDFRAS_LIBRARY_VERSION "0.17"
+// 0.17 spike   2016.09.23  moved %PDF-raster marker to just before startxref
 // 0.16 spike   2016.09.06  fix: align allowed colorspaces with spec, support /CalRGB.
 // 0.15 spike   2016.08.18  fix: length of strip streams was wrong.
 // 0.14	spike	2016.07.20	pdfras_writer_managed compiles & links /clr!
@@ -39,8 +40,8 @@ typedef enum {
 	PDFRAS_BITONAL,				// 1-bit per pixel, 0=black (DeviceGray or CalGray)
 	PDFRAS_GRAY8,				// 8-bit per pixel, 0=black (CalGray)
 	PDFRAS_GRAY16,				// 16-bit per pixel, 0=black (CalGray)
-	PDFRAS_RGB24,				// 24-bit per pixel, sRGB, ICCProfile, or DeviceRGB
-	PDFRAS_RGB48,				// 48-bit per pixel, sRGB, ICCProfile, or DeviceRGB
+	PDFRAS_RGB24,				// 24-bit per pixel, (ICCBased or CalRGB)
+	PDFRAS_RGB48,				// 48-bit per pixel, (ICCBased or CalRGB)
 } RasterPixelFormat;
 
 // Compression Modes

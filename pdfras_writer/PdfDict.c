@@ -11,8 +11,6 @@ typedef struct t_pddict
 {
 	t_pdhashatomtovalue *elems;
 	pdbool isStream;
-	// handler to be called just before writing final '>>'
-	f_dict_pre_close_handler preCloseHandler;
 } t_pddict;
 
 // pseudo-inherits from t_pddict
@@ -124,22 +122,6 @@ void pd_dict_foreach(t_pdvalue dict, f_pdhashatomtovalue_iterator iter, void *co
 	DEREFERENCE(dict);
 	if (!IS_DICT(dict) || !dict.value.dictvalue) return;
 	pd_hashatomtovalue_foreach(dict.value.dictvalue->elems, iter, cookie);
-}
-
-void __pd_dict_set_pre_close(t_pdvalue dict, f_dict_pre_close_handler handler)
-{
-	DEREFERENCE(dict);
-	if (!IS_DICT(dict) || !dict.value.dictvalue) return;
-	dict.value.dictvalue->preCloseHandler = handler;
-}
-
-void __pd_dict_pre_close(t_pdvalue dict, t_pdoutstream *os)
-{
-	DEREFERENCE(dict);
-	if (!IS_DICT(dict) || !dict.value.dictvalue) return;
-	if (dict.value.dictvalue->preCloseHandler) {
-		dict.value.dictvalue->preCloseHandler(dict, os);
-	}
 }
 
 ///////////////////////////////////////////////////////////////////////

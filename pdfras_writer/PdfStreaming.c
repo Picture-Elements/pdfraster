@@ -290,8 +290,6 @@ static void writedict(t_pdoutstream *os, t_pdvalue dict)
 	if (IS_DICT(dict)) {
 		pd_puts(os, "<<");
 		pd_dict_foreach(dict, itemwriter, os);
-		// do any special thing just before closing off this dictionary:
-		__pd_dict_pre_close(dict, os);
 		// close the dictionary
 		pd_puts(os, " >>");
 		// If it's also a stream, append the stream<data>endstream
@@ -460,17 +458,18 @@ void pd_write_endofdocument(t_pdoutstream *stm, t_pdxref *xref, t_pdvalue catalo
 		pd_dict_put(trailer, PDA_ID, file_id);
 
 		pd_xref_writeallpendingreferences(xref, stm);
-        pd_outstream_fire_event(stm, PDF_OUTPUT_BEFORE_XREF);
+        pd_outstream_fire_event(stm, PDF_EVENT_BEFORE_XREF);
 		// note the position of the XREF table
 		pduint32 pos = pd_outstream_pos(stm);
 		// write the XREF table
 		pd_xref_writetable(xref, stm);
 		// write the trailer dictionary
-		pd_puts(stm, "trailer\n");
+        pd_outstream_fire_event(stm, PDF_EVENT_BEFORE_TRAILER);
+        pd_puts(stm, "trailer\n");
 		pd_write_value(stm, trailer);
 		// write the EOF sequence, including pointer to XREF table
 		pd_putc(stm, '\n');
-        pd_outstream_fire_event(stm, PDF_OUTPUT_STARTXREF);
+        pd_outstream_fire_event(stm, PDF_EVENT_BEFORE_STARTXREF);
 		pd_puts(stm, "startxref\n");
 		pd_putint(stm, pos);
 		pd_puts(stm, "\n%%EOF\n");

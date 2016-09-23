@@ -52,9 +52,6 @@ extern void pd_dict_foreach(t_pdvalue dict, f_pdhashatomtovalue_iterator iter, v
 // * internal use only *
 // Return the current capacity (no. of entries allocated) in a dictionary
 extern int __pd_dict_capacity(t_pdvalue dict);
-typedef void(*f_dict_pre_close_handler)(t_pdvalue dict, t_pdoutstream *os);
-extern void __pd_dict_set_pre_close(t_pdvalue dict, f_dict_pre_close_handler handler);
-extern void __pd_dict_pre_close(t_pdvalue dict, t_pdoutstream *os);
 
 ///////////////////////////////////////////////////////////////////////
 // Streams - which are a species of Dictionary

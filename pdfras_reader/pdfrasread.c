@@ -9,10 +9,15 @@
 #define MIN(a,b) ((a)<(b) ? (a) : (b))
 #define MAX(a,b) ((a)>(b) ? (a) : (b))
 
+// how many bytes back from EOF to read when
+// checking for PDF/raster marker
+#define TAILSIZE 64
+
 ///////////////////////////////////////////////////////////////////////
 // Internal Constants
 
-#define PDFRASREAD_VERSION "0.7.8.0"
+#define PDFRASREAD_VERSION "0.7.9.0"
+// 0.7.9.0  spike   2016.09.23  look for PDF-raster marker in last TAILSIZE bytes
 // 0.7.8.0  spike   2016.09.23  handle PDF comments! (treat as whitespace)
 // 0.7.7.0  spike   2016.09.05  slighly improved & simplified dict & stream parsing.
 // 0.7.6.0  spike   2016.09.03  /CalRGB parsing, fixed /ICCBased parse
@@ -347,7 +352,7 @@ static size_t pdfras_read_tail(t_pdfrasreader* reader, char* tail, size_t len)
 int pdfrasread_recognize_source(t_pdfrasreader* reader, void* source, int* pmajor, int* pminor)
 {
     char head[32+1];
-    char tail[1024+1];
+    char tail[TAILSIZE+1];
     if (pmajor) *pmajor = -1;
     if (pminor) *pminor = -1;
     if (!VALID(reader)) {
@@ -1729,7 +1734,7 @@ static int validate_catalog(t_pdfrasreader* reader, pduint32 catpos)
 // Return TRUE if all OK, FALSE if some problem.
 static int parse_trailer(t_pdfrasreader* reader)
 {
-	char tail[1024+1];
+	char tail[TAILSIZE+1];
 	size_t tailsize = pdfras_read_tail(reader, tail, sizeof tail - 1);
     pduint32 off = reader->filesize - tailsize;
     const char* eof = memrstr(tail, tail+tailsize, "%%EOF");
