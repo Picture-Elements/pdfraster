@@ -12,7 +12,8 @@
 ///////////////////////////////////////////////////////////////////////
 // Internal Constants
 
-#define PDFRASREAD_VERSION "0.7.7.0"
+#define PDFRASREAD_VERSION "0.7.8.0"
+// 0.7.8.0  spike   2016.09.23  handle PDF comments! (treat as whitespace)
 // 0.7.7.0  spike   2016.09.05  slighly improved & simplified dict & stream parsing.
 // 0.7.6.0  spike   2016.09.03  /CalRGB parsing, fixed /ICCBased parse
 //                              fix! trailer parse failed if NUL in last KByte.
@@ -475,6 +476,7 @@ static int skip_whitespace(t_pdfrasreader* reader, pduint32* poff)
 	}
 	unsigned i = (*poff - reader->buffer.off);
 	assert(i <= reader->buffer.len);
+    int in_comment = FALSE;
 	while (TRUE) {
 		if (i == reader->buffer.len) {
 			if (!advance_buffer(reader, poff)) {
@@ -484,8 +486,20 @@ static int skip_whitespace(t_pdfrasreader* reader, pduint32* poff)
 			i = 0;
 		}
 		assert(i < reader->buffer.len);
-		if (!isspace(reader->buffer.data[i])) {
-			break;
+        char ch = reader->buffer.data[i];
+        if (in_comment) {
+            // once in a comment, only end-of-line chars
+            // (or EOF) get us out.
+            if (ch == '\r' || ch == '\n') {
+                in_comment = FALSE;
+            }
+        } else if (!isspace(ch)) {
+            if (ch == '%') {
+                in_comment = TRUE;
+            }
+            else {
+                break;
+            }
 		}
 		// advance over whitespace character:
 		i++; *poff += 1;
