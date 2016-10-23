@@ -739,7 +739,7 @@ static void validate_xmp_time_string(const char* xmp)
 	ASSERT(isdigit(xmp[2]));	// decade
 	ASSERT(isdigit(xmp[3]));	// year in decade
 	ASSERT(xmp[4] == '-');
-	ASSERT(xmp[5] == '0' || xmp[6] == '1');	// 1st digit of month
+	ASSERT(xmp[5] == '0' || xmp[5] == '1');	// 1st digit of month
 	ASSERT(isdigit(xmp[6]));	// 2nd digit of month
 	int month = (xmp[5] - '0') * 10 + xmp[6] - '0';
 	ASSERT(month >= 1 && month <= 12);
