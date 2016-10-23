@@ -89,11 +89,11 @@ void read_string_from_file(const wchar_t* in_file_name, int offset, int len, uns
 
 //******************* Hardcoded stuff is here:
 //download testing certificate from: https://drive.google.com/file/d/0B1ppJrJ4SN8EZG1rY1RidVNvMjA/view?usp=sharing
-#define PFX_FILE_NAME L"p:\\security\\RomanToda(test).pfx"
+#define PFX_FILE_NAME L"RomanToda(test).pfx"
 #define PFX_PASSWORD "openpassword"
 
 //download prepared file to be signed from: https://drive.google.com/file/d/0B1ppJrJ4SN8ESEN6cklCZkh5ZkU/view?usp=sharing 
-#define TO_SIGN_PDF_FILE L"p:\\security\\to_sign.pdf"
+#define TO_SIGN_PDF_FILE L"to_sign.pdf"
 
 // hardcoded byterange from the pdf file
 #define BYTERANGE_OFFSET_1 0
@@ -102,7 +102,7 @@ void read_string_from_file(const wchar_t* in_file_name, int offset, int len, uns
 #define BYTERANGE_LEN_2 527
 
 // Where to store signed document
-#define SIGNED_PDF_FILE L"p:\\security\\signed.pdf"
+#define SIGNED_PDF_FILE L"signed.pdf"
 
 int sign_file() 
 {
