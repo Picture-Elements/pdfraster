@@ -28,20 +28,30 @@ typedef struct t_pdfrasencoder {
 	t_pdvalue			trailer;
 	// optional document objects
 	t_pdvalue			rgbColorspace;		// current colorspace for RGB images
-	// current page object and related values
-	t_pdvalue			currentPage;
-	double				xdpi;				// horizontal resolution, pixels/inch
-	double				ydpi;				// vertical resolution, pixels/inch
-	int					rotation;			// page rotation (degrees clockwise)
-	RasterPixelFormat	pixelFormat;		// how pixels are represented
 	pdbool				bitonalUncal;		// use uncalibrated /DeviceGray for bitonal images
-	int					width;				// image width in pixels
-	RasterCompression	compression;		// how data is compressed
-	int					strips;				// number of strips on current page
-	int					height;				// total pixel height of current page
-	int					phys_pageno;		// physical page number
-	int					page_front;			// front/back/unspecified
+	// page parameters, apply to subsequently started pages
+    int                 next_page_rotation;
+    double              next_page_xdpi;
+    double              next_page_ydpi;
+	RasterPixelFormat	next_page_pixelFormat;		// how pixels are represented
+	RasterCompression	next_page_compression;		// compression setting for next page
 
+    // current page object
+	t_pdvalue			currentPage;
+    int					strips;				// number of strips on current page
+    int					height;				// total pixel height of current page
+
+    // page parameters, established at start of page or when first strip
+    // is written
+	int					rotation;			// page rotation (degrees clockwise)
+	int					width;				// image width in pixels
+    double				xdpi;				// horizontal resolution, pixels/inch
+    double				ydpi;				// vertical resolution, pixels/inch
+    RasterPixelFormat   pixelFormat;        // format of pixels
+    RasterCompression   compression;        // compression algorithm
+    t_pdvalue           colorspace;         // colorspace
+    int					phys_pageno;		// physical page number
+    int					page_front;			// front/back/unspecified
 } t_pdfrasencoder;
 
 
@@ -71,10 +81,13 @@ t_pdfrasencoder* pdfr_encoder_create(int apiLevel, t_OS *os)
 		enc->apiLevel = apiLevel;				// level of this API assumed by caller
 		enc->stm = pd_outstream_new(pool, os);	// our PDF-output stream abstraction
 
-		enc->xdpi = enc->ydpi = 300;			// default resolution
-		enc->rotation = 0;						// default page rotation
-		enc->compression = PDFRAS_UNCOMPRESSED;	// default compression
-		enc->pixelFormat = PDFRAS_BITONAL;		// default pixel format
+		enc->next_page_rotation = 0;						// default page rotation
+		enc->next_page_xdpi = enc->next_page_ydpi = 300;    // default resolution
+		enc->next_page_compression = PDFRAS_UNCOMPRESSED;	// default compression for next page
+		enc->next_page_pixelFormat = PDFRAS_BITONAL;		// default pixel format
+        enc->phys_pageno = -1;			    // unspecified
+        enc->page_front = -1;			    // unspecified
+
 		// initial atom table
 		enc->atoms = pd_atom_table_new(pool, 128);
 		// empty cross-reference table:
@@ -156,29 +169,32 @@ void pdfr_encoder_write_page_xmp(t_pdfrasencoder *enc, const char* xmpdata)
 
 void pdfr_encoder_set_resolution(t_pdfrasencoder *enc, double xdpi, double ydpi)
 {
-	enc->xdpi = xdpi;
-	enc->ydpi = ydpi;
+	enc->next_page_xdpi = xdpi;
+	enc->next_page_ydpi = ydpi;
 }
 
-// Set the rotation for current and subsequent pages.
+// Set the rotation for subsequent pages.
 // Values that are not multiple of 90 are *ignored*.
 // Valid values are mapped into the range 0, 90, 180, 270.
 void pdfr_encoder_set_rotation(t_pdfrasencoder* enc, int degCW)
 {
 	while (degCW < 0) degCW += 360;
+    degCW = degCW % 360;
 	if (degCW % 90 == 0) {
-		enc->rotation = degCW % 360;
+		enc->next_page_rotation = degCW;
 	}
 }
 
 void pdfr_encoder_set_pixelformat(t_pdfrasencoder* enc, RasterPixelFormat format)
 {
-	enc->pixelFormat = format;
+	enc->next_page_pixelFormat = format;
 }
 
+// establishes compression to be used the next time a page is
+// started (on first strip write).
 void pdfr_encoder_set_compression(t_pdfrasencoder* enc, RasterCompression comp)
 {
-	enc->compression = comp;
+	enc->next_page_compression = comp;
 }
 
 int pdfr_encoder_set_bitonal_uncalibrated(t_pdfrasencoder* enc, int uncal)
@@ -214,12 +230,13 @@ int pdfr_encoder_start_page(t_pdfrasencoder* enc, int width)
 	}
     assert(IS_NULL(enc->currentPage));
 	enc->width = width;
+    // put the 'next page' settings into effect for this page
+    enc->xdpi = enc->next_page_xdpi;
+    enc->ydpi = enc->next_page_ydpi;
+    enc->rotation = enc->next_page_rotation;
+    // reset strip count and row count
 	enc->strips = 0;				// number of strips written to current page
 	enc->height = 0;				// height of current page so far
-
-	// per-page metadata:
-	enc->phys_pageno = -1;			// unspecified
-	enc->page_front = -1;			// unspecified
 
 	double W = width / enc->xdpi * 72.0;
 	// Start a new page (of unknown height)
@@ -304,12 +321,23 @@ t_pdvalue pdfr_encoder_get_colorspace(t_pdfrasencoder* enc)
 	return pderrvalue();
 }
 
+static void start_strip_zero(t_pdfrasencoder* enc)
+{
+    enc->compression = enc->next_page_compression;
+    enc->pixelFormat = enc->next_page_pixelFormat;
+    enc->colorspace = pdfr_encoder_get_colorspace(enc);
+}
+
 int pdfr_encoder_write_strip(t_pdfrasencoder* enc, int rows, const pduint8 *buf, size_t len)
 {
-	t_pdvalue colorspace = pdfr_encoder_get_colorspace(enc);
+    if (enc->strips == 0) {
+        // first strip on this page, all strips on page
+        // must have same format, compression and colorspace.
+        start_strip_zero(enc);
+    }
 	char stripname[5+12] = "strip";
 
-	e_ImageCompression comp;
+	e_ImageCompression comp = kCompNone;
 	switch (enc->compression) {
 	case PDFRAS_CCITTG4:
 		comp = kCompCCITT;
@@ -318,10 +346,9 @@ int pdfr_encoder_write_strip(t_pdfrasencoder* enc, int rows, const pduint8 *buf,
 		comp = kCompDCT;
 		break;
 	default:
-		comp = kCompNone;
 		break;
 	}
-	int bitsPerComponent;
+	int bitsPerComponent = 8;
 	switch (enc->pixelFormat) {
 	case PDFRAS_BITONAL:
 		bitsPerComponent = 1;
@@ -331,7 +358,6 @@ int pdfr_encoder_write_strip(t_pdfrasencoder* enc, int rows, const pduint8 *buf,
 		bitsPerComponent = 16;
 		break;
 	default:
-		bitsPerComponent = 8;
 		break;
 	} // switch
 	t_stripinfo stripinfo;
@@ -341,7 +367,7 @@ int pdfr_encoder_write_strip(t_pdfrasencoder* enc, int rows, const pduint8 *buf,
 		enc->width, rows, bitsPerComponent,
 		comp,
 		kCCIITTG4, PD_FALSE,			// ignored unless compression is CCITT
-		colorspace);
+		enc->colorspace);
 	// get a reference to this (strip) image
 	t_pdvalue imageref = pd_xref_makereference(enc->xref, image);
 	pditoa(enc->strips, stripname + 5);
@@ -456,7 +482,10 @@ int pdfr_encoder_end_page(t_pdfrasencoder* enc)
 		// done with current page:
 		enc->currentPage = pdnullvalue();
 	}
-	return 0;
+    // clear one-time page metadata
+    enc->phys_pageno = -1;			// unspecified
+    enc->page_front = -1;			// unspecified
+    return 0;
 }
 
 int pdfr_encoder_page_count(t_pdfrasencoder* enc)

@@ -14,7 +14,8 @@ extern "C" {
 // Version of the file format we support (or at least, write)
 #define PDFRASTER_SPEC_VERSION "1.0"
 
-#define PDFRAS_LIBRARY_VERSION "0.17"
+#define PDFRAS_LIBRARY_VERSION "0.18"
+// 0.18 spike   2016.10.23  clarified/enforced image params that must be same for all strips on page.
 // 0.17 spike   2016.09.23  moved %PDF-raster marker to just before startxref
 // 0.16 spike   2016.09.06  fix: align allowed colorspaces with spec, support /CalRGB.
 // 0.15 spike   2016.08.18  fix: length of strip streams was wrong.
@@ -94,13 +95,19 @@ void pdfr_encoder_write_page_xmp(t_pdfrasencoder *enc, const char* xmpdata);
 // Attach XMP metadata to the document.
 void pdfr_encoder_write_document_xmp(t_pdfrasencoder *enc, const char* xmpdata);
 
+// Set the viewing angle for subsequent pages.
+// The angle is a rotation clockwise in degrees and must be a multiple of 90.
+// The viewing angle is initially 0.
+void pdfr_encoder_set_rotation(t_pdfrasencoder* enc, int degCW);
+
 // Set the resolution for subsequent pages
 void pdfr_encoder_set_resolution(t_pdfrasencoder *enc, double xdpi, double ydpi);
 
 // Set the pixel format for subsequent pages
 void pdfr_encoder_set_pixelformat(t_pdfrasencoder* enc, RasterPixelFormat format);
 
-// Set the compression mode/algorithm/technique for subsequent pages
+// Set the compression mode/algorithm to be used in writing subsequent pages.
+// Takes effect when first strip is written to a page.
 void pdfr_encoder_set_compression(t_pdfrasencoder* enc, RasterCompression comp);
 
 // Turn on or off 'uncalibrated' (raw, device) colorspace for subsequent
@@ -126,37 +133,36 @@ void pdfr_encoder_define_rgb_icc_colorspace(t_pdfrasencoder* enc, const pduint8 
 // (For whitepoint, the default is taken to be [ 1 1 1 ].)
 void pdfr_encoder_define_calrgb_colorspace(t_pdfrasencoder* enc, double gamma[3], double black[3], double white[3], double matrix[9]);
 
-// Set the viewing angle for the current page (if any) and subsequent pages.
-// The angle is a rotation clockwise in degrees and must be a multiple of 90.
-// The viewing angle is initially 0.
-void pdfr_encoder_set_rotation(t_pdfrasencoder* enc, int degCW);
-
 // Start encoding a page in the current document.
 // If a page is currently open, that page is automatically ended before the new page is started.
 int pdfr_encoder_start_page(t_pdfrasencoder* enc, int width);
 
-// Set the physical page number for the current page.
-// If not set, this property defaults to -1: 'unspecified'.
+// Set the physical page number for the next or current page.
+// Applies to the current page if one is open, otherwise to the next page started.
+// If not set, this property defaults to -1, 'unspecified'.
 void pdfr_encoder_set_physical_page_number(t_pdfrasencoder* enc, int phpageno);
 
-// Mark the current page as being a front or back side.
+// Mark the next or current page as being a front or back side.
+// Applies to the current page if one is open, otherwise to the next page started.
 // frontness must be 1 (front side), 0 (back side), or -1 (unspecified)
-// If not set, this property defaults to -1 'unspecified'.
+// If not set, this property defaults to -1, 'unspecified'.
 void pdfr_encoder_set_page_front(t_pdfrasencoder* enc, int frontness);
 
 // Append a strip to the current page of the current document.
-// rows is the height - number of rows - in the strip.
+// rows is the height (number of rows) in the strip.
 // The data is len bytes, starting at buf.
-// The data must be in the correct pixel format,
-// must have the width given for the page,
-// and must be compressed with the specified compression.
+// The data is assumed to have the width, resolution, pixel format,
+// compression, colorspace and rotation that you specified (or defaulted)
+// for the currently open page.
+//
 // Can be called any number of times to deliver the data for the current page.
 // Invalid if no page is open.
 // The data is copied byte - for - byte into the output PDF.
 // Each row must start on the next byte following the last byte of the preceding row.
-// JPEG compressed data must be encoded in the JPEG baseline format.
-// Color images must be transformed to YUV space as part of JPEG compression, grayscale images are not transformed.
-// CCITT compressed data must be compressed in accordance with the following PDF Optional parameters for the CCITTFaxDecode filter:
+// JPEG-compressed data must be encoded in the JPEG baseline format. This includes
+// transformation to YUV space as part of compression. Grayscale images are not transformed.
+// CCITT compressed data must be compressed in accordance with the following PDF Optional parameters
+// for the CCITTFaxDecode filter:
 // K = -1, EndOfLine=false, EncodedByteAlign=false, BlackIs1=false
 int pdfr_encoder_write_strip(t_pdfrasencoder* enc, int rows, const pduint8 *buf, size_t len);
 
